@@ -29242,6 +29242,7 @@ async function run() {
             required: true
         });
         const webspaceName = `${webspacePrefix}-${appKey}-${github_1.default.context.payload.ref}`.trim();
+        const databasePrefix = `${webspacePrefix}-${github_1.default.context.payload.ref}`.trim();
         const webRoot = webspaceName
             .toLowerCase()
             .replace(/[^a-z0-9-/]/, '');
@@ -29293,36 +29294,57 @@ async function run() {
                 }
             }
             core.setOutput('deploy-path', `/home/${httpUser}/html/${webRoot}`);
-            core.setOutput('domain-name', '');
+            core.setOutput('domain-name', vhost.enableSystemAlias ? vhost.systemAlias : vhost.domainName);
         }
         for (const relict of foundVhosts.filter(v => !Object.keys(app.web).includes(v.domainName))) {
             await deleteVhostById(relict.id);
         }
         const envVars = {};
-        const foundDatabases = await findDatabasesByWebspace(webspaceName);
+        const foundDatabases = await findDatabasesByWebspace(databasePrefix);
         for (const [relationName, databaseName] of Object.entries(app.databases ?? {})) {
-            const databaseInternalName = `${webspaceName}--${databaseName.toLowerCase()}`;
-            if (null !==
-                (foundDatabases.find(d => d.name === databaseInternalName) ?? null)) {
-                continue;
+            const databaseInternalName = `${databasePrefix}--${databaseName.toLowerCase()}`;
+            const existingDatabase = foundDatabases.find(d => d.name === databaseInternalName) ?? null;
+            if (null !== existingDatabase) {
+                const usersWithAccess = await findDatabaseAccesses(webspaceName, existingDatabase.id);
+                if (!usersWithAccess.length) {
+                    const { database, databaseUserName, databasePassword } = await addDatabaseAccess(existingDatabase, webspaceName);
+                    Object.assign(Object.fromEntries([
+                        [
+                            `${relationName.toUpperCase()}_SERVER`,
+                            `mysql://${database.hostName}`
+                        ],
+                        [`${relationName.toUpperCase()}_DRIVER`, 'mysql'],
+                        [`${relationName.toUpperCase()}_HOST`, database.hostName],
+                        [`${relationName.toUpperCase()}_PORT`, 3306],
+                        [`${relationName.toUpperCase()}_NAME`, database.dbName],
+                        [`${relationName.toUpperCase()}_USERNAME`, databaseUserName],
+                        [`${relationName.toUpperCase()}_PASSWORD`, databasePassword],
+                        [
+                            `${relationName.toUpperCase()}_URL`,
+                            `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
+                        ]
+                    ]), envVars);
+                }
             }
-            const { database, databaseUserName, databasePassword } = await createDatabase(app, webspaceName, databaseName);
-            Object.assign(Object.fromEntries([
-                [
-                    `${relationName.toUpperCase()}_SERVER`,
-                    `mysql://${database.hostName}`
-                ],
-                [`${relationName.toUpperCase()}_DRIVER`, 'mysql'],
-                [`${relationName.toUpperCase()}_HOST`, database.hostName],
-                [`${relationName.toUpperCase()}_PORT`, 3306],
-                [`${relationName.toUpperCase()}_NAME`, database.dbName],
-                [`${relationName.toUpperCase()}_USERNAME`, databaseUserName],
-                [`${relationName.toUpperCase()}_PASSWORD`, databasePassword],
-                [
-                    `${relationName.toUpperCase()}_URL`,
-                    `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
-                ]
-            ]), envVars);
+            else {
+                const { database, databaseUserName, databasePassword } = await createDatabase(app, webspaceName, databaseInternalName);
+                Object.assign(Object.fromEntries([
+                    [
+                        `${relationName.toUpperCase()}_SERVER`,
+                        `mysql://${database.hostName}`
+                    ],
+                    [`${relationName.toUpperCase()}_DRIVER`, 'mysql'],
+                    [`${relationName.toUpperCase()}_HOST`, database.hostName],
+                    [`${relationName.toUpperCase()}_PORT`, 3306],
+                    [`${relationName.toUpperCase()}_NAME`, database.dbName],
+                    [`${relationName.toUpperCase()}_USERNAME`, databaseUserName],
+                    [`${relationName.toUpperCase()}_PASSWORD`, databasePassword],
+                    [
+                        `${relationName.toUpperCase()}_URL`,
+                        `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
+                    ]
+                ]), envVars);
+            }
         }
         core.setSecret('env-vars');
         core.setOutput('env-vars', envVars);
@@ -29395,13 +29417,32 @@ async function findVhostByWebspace(webspaceId) {
     });
     return response.result?.response?.data ?? [];
 }
-async function findDatabasesByWebspace(webspaceName) {
+async function findDatabaseAccesses(webspaceName, databaseId) {
+    const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/vhostsFind', {
+        authToken: token,
+        filter: {
+            subFilterConnective: 'AND',
+            subFilter: [
+                {
+                    field: 'userName',
+                    value: webspaceName
+                },
+                {
+                    field: 'userAccessesDatabaseId',
+                    value: databaseId
+                }
+            ]
+        }
+    });
+    return response.result?.response?.data ?? [];
+}
+async function findDatabasesByWebspace(databasePrefix) {
     const response = await _http.postJson('https://secure.hosting.de/api/database/v1/json/databasesFind', {
         authToken: token,
         limit: 1,
         filter: {
             field: 'databaseName',
-            value: `${webspaceName}--*`
+            value: `${databasePrefix}--*`
         }
     });
     return response.result?.response?.data ?? [];
@@ -29445,6 +29486,32 @@ async function createDatabase(manifest, webspaceName, databaseName) {
             }
         ],
         poolId: manifest.pool ?? null
+    });
+    if (null === response.result) {
+        throw new Error('Unexpected error');
+    }
+    return {
+        database: response.result.response,
+        databaseUserName: user.dbUserName,
+        databasePassword: password
+    };
+}
+async function addDatabaseAccess(database, webspaceName) {
+    const { user, password } = await createDatabaseUser(webspaceName);
+    const response = await _http.postJson('https://secure.hosting.de/api/database/v1/json/databaseUpdate', {
+        authToken: token,
+        database: {
+            id: database.id,
+            name: database.name,
+            productCode: database.productCode,
+            forceSsl: database.forceSsl,
+            storageQuota: database.storageQuota,
+            comments: database.comments
+        },
+        accesses: database.accesses.push({
+            userId: user.id,
+            accessLevel: ['read', 'write', 'schema']
+        })
     });
     if (null === response.result) {
         throw new Error('Unexpected error');
