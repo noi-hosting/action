@@ -14,6 +14,10 @@ inputs:
       A unique name for webspaces that are related to the build. Example
       `my-app`.
     required: true
+  ssh-public-key:
+    description:
+      The SSH public key that matches the private key configured for deploying.
+    required: true
 
 outputs:
   ssh-user:
@@ -23,7 +27,7 @@ outputs:
   ssh-port:
     description: Port for ssh connect.
   http-user:
-    description: User to run php runtime as.
+    description: User that runs the php process (for Deployer writable action).
   deploy-path:
     description: Deploy path to set for Deployer action.
 
