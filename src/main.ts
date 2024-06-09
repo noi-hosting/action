@@ -87,6 +87,15 @@ interface WebspaceAccess {
   webspaceId: string
 }
 
+interface DatabaseAccess {
+  addDate: string
+  lastChangeDate: string
+  accessLevel: string[]
+  userId: string
+  userName: string
+  databaseId: string
+}
+
 interface WebspaceResult {
   id: string
   name: string
@@ -101,15 +110,22 @@ interface WebspaceResult {
 }
 
 interface UserResult {
+  id: string
   accountId: string
   addDate: string
   comments: string
-  id: string
   lastChangeDate: string
   name: string
-  sshKey: string
   status: string
+}
+
+interface WebspaceUserResult extends UserResult {
+  sshKey: string
   userName: string
+}
+
+interface DatabaseUserResult extends UserResult {
+  dbUserName: string
 }
 
 interface VhostResult {
@@ -126,6 +142,34 @@ interface VhostResult {
   httpUsers: object[]
   locations: object[]
   sslSettings: object
+}
+
+interface DatabaseResult {
+  id: string
+  accesses: DatabaseAccess[]
+  bundleId: string | null
+  poolId: string | null
+  accountId: string
+  addDate: string
+  paidUntil: string
+  renewOn: string
+  deletionScheduledFor: string | null
+  lastChangeDate: string
+  name: string
+  productCode: string
+  restorableUntil: string | null
+  status: string
+  storageQuota: number
+  storageQuotaIncluded: number
+  storageQuotaUsedRatio: number
+  storageUsed: number
+  dbName: string
+  hostName: string
+  dbEngine: string
+  dbType: string
+  forceSsl: boolean
+  restrictions: string[]
+  limitations: string[]
 }
 
 /**
@@ -202,6 +246,7 @@ export async function run(): Promise<void> {
       }
 
       core.setOutput('deploy-path', `/home/${httpUser}/html/${webRoot}`)
+      core.setOutput('domain-name', '')
     }
 
     for (const relict of foundVhosts.filter(
@@ -209,6 +254,47 @@ export async function run(): Promise<void> {
     )) {
       await deleteVhostById(relict.id)
     }
+
+    const envVars = {}
+
+    const foundDatabases = await findDatabasesByWebspace(webspaceName)
+    for (const [relationName, databaseName] of Object.entries(
+      app.databases ?? {}
+    )) {
+      const databaseInternalName = `${webspaceName}--${databaseName.toLowerCase()}`
+      if (
+        null !==
+        (foundDatabases.find(d => d.name === databaseInternalName) ?? null)
+      ) {
+        continue
+      }
+
+      const { database, databaseUserName, databasePassword } =
+        await createDatabase(app, webspaceName, databaseName)
+
+      Object.assign(
+        Object.fromEntries([
+          [
+            `${relationName.toUpperCase()}_SERVER`,
+            `mysql://${database.hostName}`
+          ],
+          [`${relationName.toUpperCase()}_DRIVER`, 'mysql'],
+          [`${relationName.toUpperCase()}_HOST`, database.hostName],
+          [`${relationName.toUpperCase()}_PORT`, 3306],
+          [`${relationName.toUpperCase()}_NAME`, database.dbName],
+          [`${relationName.toUpperCase()}_USERNAME`, databaseUserName],
+          [`${relationName.toUpperCase()}_PASSWORD`, databasePassword],
+          [
+            `${relationName.toUpperCase()}_URL`,
+            `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
+          ]
+        ]),
+        envVars
+      )
+    }
+
+    core.setSecret('env-vars')
+    core.setOutput('env-vars', envVars)
   } catch (error) {
     if (error instanceof Error) core.setFailed(error.message)
   }
@@ -311,10 +397,28 @@ async function findVhostByWebspace(webspaceId: string): Promise<VhostResult[]> {
       'https://secure.hosting.de/api/webhosting/v1/json/vhostsFind',
       {
         authToken: token,
-        limit: 1,
         filter: {
           field: 'webspaceId',
           value: webspaceId
+        }
+      }
+    )
+
+  return response.result?.response?.data ?? []
+}
+
+async function findDatabasesByWebspace(
+  webspaceName: string
+): Promise<DatabaseResult[]> {
+  const response: TypedResponse<ApiFindResponse<DatabaseResult>> =
+    await _http.postJson(
+      'https://secure.hosting.de/api/database/v1/json/databasesFind',
+      {
+        authToken: token,
+        limit: 1,
+        filter: {
+          field: 'databaseName',
+          value: `${webspaceName}--*`
         }
       }
     )
@@ -357,10 +461,53 @@ async function createWebspace(
   return response.result.response
 }
 
-async function createWebspaceUser(): Promise<UserResult> {
+async function createDatabase(
+  manifest: ManifestApp,
+  webspaceName: string,
+  databaseName: string
+): Promise<{
+  database: DatabaseResult
+  databaseUserName: string
+  databasePassword: string
+}> {
+  const { user, password } = await createDatabaseUser(webspaceName)
+
+  const response: TypedResponse<ApiActionResponse<DatabaseResult>> =
+    await _http.postJson(
+      'https://secure.hosting.de/api/database/v1/json/databaseCreate',
+      {
+        authToken: token,
+        database: {
+          name: databaseName,
+          comments:
+            'Created by setup-hostingde github action. Please do not change name.',
+          productCode: 'database-mariadb-single-v1-1m'
+        },
+        accesses: [
+          {
+            userId: user.id,
+            accessLevel: ['read', 'write', 'schema']
+          }
+        ],
+        poolId: manifest.pool ?? null
+      }
+    )
+
+  if (null === response.result) {
+    throw new Error('Unexpected error')
+  }
+
+  return {
+    database: response.result.response,
+    databaseUserName: user.dbUserName,
+    databasePassword: password
+  }
+}
+
+async function createWebspaceUser(): Promise<WebspaceUserResult> {
   const sshKey: string = core.getInput('ssh-public-key', { required: true })
 
-  const response: TypedResponse<ApiActionResponse<UserResult>> =
+  const response: TypedResponse<ApiActionResponse<WebspaceUserResult>> =
     await _http.postJson(
       'https://secure.hosting.de/api/webhosting/v1/json/userCreate',
       {
@@ -380,6 +527,32 @@ async function createWebspaceUser(): Promise<UserResult> {
   }
 
   return response.result.response
+}
+
+async function createDatabaseUser(
+  webspaceName: string
+): Promise<{ user: DatabaseUserResult; password: string }> {
+  const password = crypto.randomUUID()
+
+  const response: TypedResponse<ApiActionResponse<DatabaseUserResult>> =
+    await _http.postJson(
+      'https://secure.hosting.de/api/database/v1/json/userCreate',
+      {
+        authToken: token,
+        user: {
+          name: webspaceName,
+          comment:
+            'Created by setup-hostingde github action. Please do not remove.'
+        },
+        password
+      }
+    )
+
+  if (null === response.result) {
+    throw new Error('Unexpected error')
+  }
+
+  return { user: response.result.response, password }
 }
 
 function transformPhpIni(ini: object): object {

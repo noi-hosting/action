@@ -29293,10 +29293,39 @@ async function run() {
                 }
             }
             core.setOutput('deploy-path', `/home/${httpUser}/html/${webRoot}`);
+            core.setOutput('domain-name', '');
         }
         for (const relict of foundVhosts.filter(v => !Object.keys(app.web).includes(v.domainName))) {
             await deleteVhostById(relict.id);
         }
+        const envVars = {};
+        const foundDatabases = await findDatabasesByWebspace(webspaceName);
+        for (const [relationName, databaseName] of Object.entries(app.databases ?? {})) {
+            const databaseInternalName = `${webspaceName}--${databaseName.toLowerCase()}`;
+            if (null !==
+                (foundDatabases.find(d => d.name === databaseInternalName) ?? null)) {
+                continue;
+            }
+            const { database, databaseUserName, databasePassword } = await createDatabase(app, webspaceName, databaseName);
+            Object.assign(Object.fromEntries([
+                [
+                    `${relationName.toUpperCase()}_SERVER`,
+                    `mysql://${database.hostName}`
+                ],
+                [`${relationName.toUpperCase()}_DRIVER`, 'mysql'],
+                [`${relationName.toUpperCase()}_HOST`, database.hostName],
+                [`${relationName.toUpperCase()}_PORT`, 3306],
+                [`${relationName.toUpperCase()}_NAME`, database.dbName],
+                [`${relationName.toUpperCase()}_USERNAME`, databaseUserName],
+                [`${relationName.toUpperCase()}_PASSWORD`, databasePassword],
+                [
+                    `${relationName.toUpperCase()}_URL`,
+                    `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
+                ]
+            ]), envVars);
+        }
+        core.setSecret('env-vars');
+        core.setOutput('env-vars', envVars);
     }
     catch (error) {
         if (error instanceof Error)
@@ -29359,10 +29388,20 @@ async function deleteVhostById(vhostId) {
 async function findVhostByWebspace(webspaceId) {
     const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/vhostsFind', {
         authToken: token,
-        limit: 1,
         filter: {
             field: 'webspaceId',
             value: webspaceId
+        }
+    });
+    return response.result?.response?.data ?? [];
+}
+async function findDatabasesByWebspace(webspaceName) {
+    const response = await _http.postJson('https://secure.hosting.de/api/database/v1/json/databasesFind', {
+        authToken: token,
+        limit: 1,
+        filter: {
+            field: 'databaseName',
+            value: `${webspaceName}--*`
         }
     });
     return response.result?.response?.data ?? [];
@@ -29390,6 +29429,32 @@ async function createWebspace(manifest, name) {
     }
     return response.result.response;
 }
+async function createDatabase(manifest, webspaceName, databaseName) {
+    const { user, password } = await createDatabaseUser(webspaceName);
+    const response = await _http.postJson('https://secure.hosting.de/api/database/v1/json/databaseCreate', {
+        authToken: token,
+        database: {
+            name: databaseName,
+            comments: 'Created by setup-hostingde github action. Please do not change name.',
+            productCode: 'database-mariadb-single-v1-1m'
+        },
+        accesses: [
+            {
+                userId: user.id,
+                accessLevel: ['read', 'write', 'schema']
+            }
+        ],
+        poolId: manifest.pool ?? null
+    });
+    if (null === response.result) {
+        throw new Error('Unexpected error');
+    }
+    return {
+        database: response.result.response,
+        databaseUserName: user.dbUserName,
+        databasePassword: password
+    };
+}
 async function createWebspaceUser() {
     const sshKey = core.getInput('ssh-public-key', { required: true });
     const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/userCreate', {
@@ -29405,6 +29470,21 @@ async function createWebspaceUser() {
         throw new Error('Unexpected error');
     }
     return response.result.response;
+}
+async function createDatabaseUser(webspaceName) {
+    const password = crypto_1.default.randomUUID();
+    const response = await _http.postJson('https://secure.hosting.de/api/database/v1/json/userCreate', {
+        authToken: token,
+        user: {
+            name: webspaceName,
+            comment: 'Created by setup-hostingde github action. Please do not remove.'
+        },
+        password
+    });
+    if (null === response.result) {
+        throw new Error('Unexpected error');
+    }
+    return { user: response.result.response, password };
 }
 function transformPhpIni(ini) {
     return Object.entries(ini).map(([k, v]) => ({ key: k, value: v }));
