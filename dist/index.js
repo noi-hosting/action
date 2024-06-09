@@ -29224,6 +29224,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const wait_1 = __nccwpck_require__(5259);
+const crypto_1 = __importDefault(__nccwpck_require__(6113));
 const github_1 = __importDefault(__nccwpck_require__(5438));
 const http_client_1 = __nccwpck_require__(6255);
 const fs = __importStar(__nccwpck_require__(7147));
@@ -29237,9 +29238,6 @@ const token = core.getInput('auth-token', { required: true });
 async function run() {
     try {
         const appKey = core.getInput('app', { required: true });
-        const webspaceUser = core.getInput('webspace-user', {
-            required: true
-        });
         const webspacePrefix = core.getInput('webspace-prefix', {
             required: true
         });
@@ -29260,18 +29258,18 @@ async function run() {
         }
         else {
             core.info('Creating a new webspace…');
-            webspace = await createWebspace(app, webspaceName, webspaceUser);
+            webspace = await createWebspace(app, webspaceName);
             do {
                 await (0, wait_1.wait)(2000);
                 core.info(`Waiting for webspace ${webspace.id} to boot…`);
-                foundWebspace = await findWebspaceById(webspaceUser);
+                foundWebspace = await findWebspaceById(webspace.id);
                 if (null === foundWebspace) {
                     break;
                 }
                 webspace = foundWebspace;
             } while ('active' !== webspace.status);
         }
-        const webspaceAccess = webspace.accesses.find(a => a.userId === webspaceUser) ?? null;
+        const webspaceAccess = webspace.accesses.find(a => a.sshAccess) ?? null;
         const sshUser = webspaceAccess?.userName;
         const sshHost = webspace.hostName;
         const httpUser = webspace.webspaceName;
@@ -29369,7 +29367,8 @@ async function findVhostByWebspace(webspaceId) {
     });
     return response.result?.response?.data ?? [];
 }
-async function createWebspace(manifest, name, user) {
+async function createWebspace(manifest, name) {
+    const user = await createWebspaceUser();
     const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/webspaceCreate', {
         authToken: token,
         webspace: {
@@ -29380,11 +29379,27 @@ async function createWebspace(manifest, name, user) {
         },
         accesses: [
             {
-                userId: user,
+                userId: user.id,
                 sshAccess: true
             }
         ],
         poolId: manifest.pool ?? null
+    });
+    if (null === response.result) {
+        throw new Error('Unexpected error');
+    }
+    return response.result.response;
+}
+async function createWebspaceUser() {
+    const sshKey = core.getInput('ssh-public-key', { required: true });
+    const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/userCreate', {
+        authToken: token,
+        user: {
+            sshKey,
+            name: 'github-action',
+            comment: 'Created by setup-hostingde github action. Please do not remove.'
+        },
+        password: crypto_1.default.randomUUID()
     });
     if (null === response.result) {
         throw new Error('Unexpected error');

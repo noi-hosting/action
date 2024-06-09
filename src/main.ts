@@ -2,7 +2,7 @@
 
 import * as core from '@actions/core'
 import { wait } from './wait'
-
+import crypto from 'crypto'
 import github from '@actions/github'
 import { HttpClient } from '@actions/http-client'
 import * as fs from 'fs'
@@ -100,6 +100,18 @@ interface WebspaceResult {
   accesses: WebspaceAccess[]
 }
 
+interface UserResult {
+  accountId: string
+  addDate: string
+  comments: string
+  id: string
+  lastChangeDate: string
+  name: string
+  sshKey: string
+  status: string
+  userName: string
+}
+
 interface VhostResult {
   id: string
   domainName: string
@@ -123,9 +135,6 @@ interface VhostResult {
 export async function run(): Promise<void> {
   try {
     const appKey: string = core.getInput('app', { required: true })
-    const webspaceUser: string = core.getInput('webspace-user', {
-      required: true
-    })
     const webspacePrefix: string = core.getInput('webspace-prefix', {
       required: true
     })
@@ -151,12 +160,12 @@ export async function run(): Promise<void> {
       core.info(`Using webspace ${webspace.id}`)
     } else {
       core.info('Creating a new webspace…')
-      webspace = await createWebspace(app, webspaceName, webspaceUser)
+      webspace = await createWebspace(app, webspaceName)
 
       do {
         await wait(2000)
         core.info(`Waiting for webspace ${webspace.id} to boot…`)
-        foundWebspace = await findWebspaceById(webspaceUser)
+        foundWebspace = await findWebspaceById(webspace.id)
         if (null === foundWebspace) {
           break
         }
@@ -165,7 +174,7 @@ export async function run(): Promise<void> {
     }
 
     const webspaceAccess: WebspaceAccess | null =
-      webspace.accesses.find(a => a.userId === webspaceUser) ?? null
+      webspace.accesses.find(a => a.sshAccess) ?? null
     const sshUser = webspaceAccess?.userName
     const sshHost = webspace.hostName
     const httpUser = webspace.webspaceName
@@ -315,9 +324,10 @@ async function findVhostByWebspace(webspaceId: string): Promise<VhostResult[]> {
 
 async function createWebspace(
   manifest: ManifestApp,
-  name: string,
-  user: string
+  name: string
 ): Promise<WebspaceResult> {
+  const user = await createWebspaceUser()
+
   const response: TypedResponse<ApiActionResponse<WebspaceResult>> =
     await _http.postJson(
       'https://secure.hosting.de/api/webhosting/v1/json/webspaceCreate',
@@ -332,11 +342,36 @@ async function createWebspace(
         },
         accesses: [
           {
-            userId: user,
+            userId: user.id,
             sshAccess: true
           }
         ],
         poolId: manifest.pool ?? null
+      }
+    )
+
+  if (null === response.result) {
+    throw new Error('Unexpected error')
+  }
+
+  return response.result.response
+}
+
+async function createWebspaceUser(): Promise<UserResult> {
+  const sshKey: string = core.getInput('ssh-public-key', { required: true })
+
+  const response: TypedResponse<ApiActionResponse<UserResult>> =
+    await _http.postJson(
+      'https://secure.hosting.de/api/webhosting/v1/json/userCreate',
+      {
+        authToken: token,
+        user: {
+          sshKey,
+          name: 'github-action',
+          comment:
+            'Created by setup-hostingde github action. Please do not remove.'
+        },
+        password: crypto.randomUUID()
       }
     )
 

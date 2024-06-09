@@ -14,9 +14,6 @@ inputs:
       A unique name for webspaces that are related to the build. Example
       `my-app`.
     required: true
-  webspace-user:
-    description: The user id.
-    required: true
 
 outputs:
   ssh-user:
