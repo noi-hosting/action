@@ -1,0 +1,39 @@
+name: Setup Hosting.de
+description: Helpful action to build push-to-deploy actions with Hosting.de
+author: Richard Henkenjohann
+
+inputs:
+  auth-token:
+    description: The auth token from your Hosting.de account.
+    required: true
+  app:
+    description: The key of the current application in the yaml manifest.
+    default: app
+  webspace-prefix:
+    description:
+      A unique name for webspaces that are related to the build. Example
+      `my-app`.
+    required: true
+  webspace-user:
+    description: The user id.
+    required: true
+
+outputs:
+  ssh-user:
+    description: Username for ssh connect.
+  ssh-host:
+    description: Hostname for ssh connect
+  ssh-port:
+    description: Port for ssh connect.
+  http-user:
+    description: User to run php runtime as.
+  deploy-path:
+    description: Deploy path to set for Deployer action.
+
+runs:
+  using: node20
+  main: dist/index.js
+
+branding:
+  icon: 'git-pull-request'
+  color: 'purple'
