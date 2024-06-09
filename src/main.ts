@@ -130,7 +130,7 @@ export async function run(): Promise<void> {
       required: true
     })
     const webspaceName: string =
-      `${webspacePrefix}-${github.context.payload.ref}`.trim()
+      `${webspacePrefix}-${appKey}-${github.context.payload.ref}`.trim()
     const webRoot: string = webspaceName
       .toLowerCase()
       .replace(/[^a-z0-9-/]/, '')

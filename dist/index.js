@@ -29243,7 +29243,7 @@ async function run() {
         const webspacePrefix = core.getInput('webspace-prefix', {
             required: true
         });
-        const webspaceName = `${webspacePrefix}-${github_1.default.context.payload.ref}`.trim();
+        const webspaceName = `${webspacePrefix}-${appKey}-${github_1.default.context.payload.ref}`.trim();
         const webRoot = webspaceName
             .toLowerCase()
             .replace(/[^a-z0-9-/]/, '');
