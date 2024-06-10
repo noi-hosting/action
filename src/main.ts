@@ -716,13 +716,7 @@ async function createVhost(
       }
     )
 
-  core.info(
-    JSON.stringify({
-      phpIni: {
-        values: transformPhpIni(app.php?.ini ?? {})
-      }
-    })
-  )
+  core.info(JSON.stringify(response.result))
 
   if (null === response.result) {
     throw new Error('Unexpected error')
