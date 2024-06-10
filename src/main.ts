@@ -394,7 +394,7 @@ async function findOneWebspaceByName(
         }
       }
     )
-  if (response.result?.response?.totalEntries ?? 0 > 1) {
+  if ((response.result?.response?.totalEntries ?? 0) > 1) {
     throw new Error(
       `We found more than 1 webspace with name "${webspaceName}" and cannot know where to deploy to.`
     )
