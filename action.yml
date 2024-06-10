@@ -30,7 +30,7 @@ outputs:
     description: User that runs the php process (for Deployer writable action).
   deploy-path:
     description: Deploy path to set for Deployer action.
-  domain-name:
+  public-url:
     description: The URL under that the deployment will be reachable.
   env-vars:
     description: Environment variables to set on the host (json encoded).

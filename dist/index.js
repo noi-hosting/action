@@ -33405,7 +33405,7 @@ async function run() {
                 }
             }
             core.setOutput('deploy-path', `/home/${httpUser}/html/${webRoot}`);
-            core.setOutput('domain-name', vhost.enableSystemAlias ? vhost.systemAlias : vhost.domainName);
+            core.setOutput('public-url', `https://${vhost.enableSystemAlias ? vhost.systemAlias : vhost.domainName}`);
         }
         for (const relict of foundVhosts.filter(v => !Object.keys(app.web).includes(v.domainName))) {
             await deleteVhostById(relict.id);

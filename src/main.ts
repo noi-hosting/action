@@ -258,8 +258,8 @@ export async function run(): Promise<void> {
 
       core.setOutput('deploy-path', `/home/${httpUser}/html/${webRoot}`)
       core.setOutput(
-        'domain-name',
-        vhost.enableSystemAlias ? vhost.systemAlias : vhost.domainName
+        'public-url',
+        `https://${vhost.enableSystemAlias ? vhost.systemAlias : vhost.domainName}`
       )
     }
 
