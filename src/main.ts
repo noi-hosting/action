@@ -232,11 +232,6 @@ export async function run(): Promise<void> {
     core.setOutput('ssh-port', 2244)
     core.setOutput('http-user', httpUser)
 
-    core.info('web')
-    core.info(JSON.stringify(app.web))
-    core.info(JSON.stringify(app))
-    core.info(JSON.stringify(manifest))
-
     const foundVhosts: VhostResult[] = await findVhostByWebspace(webspaceName)
     for (const [domainName, web] of Object.entries(app.web)) {
       const foundVhost =
@@ -720,6 +715,49 @@ async function createVhost(
         phpIni: transformPhpIni(app.php?.ini ?? {})
       }
     )
+
+  core.info(
+    JSON.stringify({
+      authToken: token,
+      vhost: {
+        domainName,
+        serverType: 'nginx',
+        webspaceId: webspace.id,
+        enableAlias: false,
+        additionalDomainNames: web.alias ?? [],
+        enableSystemAlias: web.previewDomain ?? false,
+        redirectToPrimaryName: web.redirect ?? true,
+        phpVersion: app.php?.version,
+        webRoot: `${webRoot}/current/${web.root ?? ''}`.replace(/\/$/, ''),
+        locations: Object.entries(web.locations ?? {}).map(function ([
+          matchString,
+          location
+        ]) {
+          return {
+            matchString,
+            matchType: matchString.startsWith('^')
+              ? 'regex'
+              : matchString.startsWith('/')
+                ? 'directory'
+                : 'default',
+            locationType: location.allow ?? true ? 'location' : 'denyLocation',
+            mapScript:
+              typeof (location.passthru ?? false) === 'string'
+                ? location.passthru
+                : '',
+            phpEnabled: false !== (location.passthru ?? false)
+          }
+        }),
+        sslSettings: {
+          profile: 'modern',
+          managedSslProductCode: 'ssl-letsencrypt-dv-3m'
+        }
+      },
+      phpIni: transformPhpIni(app.php?.ini ?? {})
+    })
+  )
+
+  core.info(JSON.stringify(response.result))
 
   if (null === response.result) {
     throw new Error('Unexpected error')
