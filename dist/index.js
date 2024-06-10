@@ -33385,7 +33385,7 @@ async function run() {
         core.setOutput('ssh-host', sshHost);
         core.setOutput('ssh-port', 2244);
         core.setOutput('http-user', httpUser);
-        const foundVhosts = await findVhostByWebspace(webspaceName);
+        const foundVhosts = await findVhostByWebspace(webspace.id);
         for (const [domainName, web] of Object.entries(app.web)) {
             const foundVhost = foundVhosts.find(v => v.domainName === domainName) ?? null;
             let vhost;
