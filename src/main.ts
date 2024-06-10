@@ -272,6 +272,7 @@ export async function run(): Promise<void> {
       const existingDatabase =
         foundDatabases.find(d => d.name === databaseInternalName) ?? null
       if (null !== existingDatabase) {
+        core.info(`Granting access on database ${databaseInternalName}`)
         const usersWithAccess = await findDatabaseAccesses(
           webspaceName,
           existingDatabase.id
@@ -301,6 +302,8 @@ export async function run(): Promise<void> {
           )
         }
       } else {
+        core.info(`Creating database ${databaseInternalName}`)
+
         const { database, databaseUserName, databasePassword } =
           await createDatabase(app, webspaceName, databaseInternalName)
 
