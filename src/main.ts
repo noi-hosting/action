@@ -458,7 +458,7 @@ async function findDatabaseAccesses(
 ): Promise<DatabaseUserResult[]> {
   const response: TypedResponse<ApiFindResponse<DatabaseUserResult>> =
     await _http.postJson(
-      'https://secure.hosting.de/api/webhosting/v1/json/vhostsFind',
+      'https://secure.hosting.de/api/webhosting/v1/json/usersFind',
       {
         authToken: token,
         filter: {
@@ -476,6 +476,25 @@ async function findDatabaseAccesses(
         }
       }
     )
+
+  core.info(
+    JSON.stringify({
+      authToken: token,
+      filter: {
+        subFilterConnective: 'AND',
+        subFilter: [
+          {
+            field: 'userName',
+            value: webspaceName
+          },
+          {
+            field: 'userAccessesDatabaseId',
+            value: databaseId
+          }
+        ]
+      }
+    })
+  )
 
   return response.result?.response?.data ?? []
 }
