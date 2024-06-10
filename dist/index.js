@@ -33379,7 +33379,10 @@ async function run() {
         }
         const availableUsers = await findWebspaceUsers();
         const webspaceAccess = webspace.accesses.find(a => availableUsers.find(u => u.id === a.userId)) ?? null;
-        const sshUser = webspaceAccess?.userName;
+        if (null === webspaceAccess) {
+            throw new Error(`It seems that the SSH access to the webspace was revoked for the github-action.`);
+        }
+        const sshUser = webspaceAccess.userName;
         const sshHost = webspace.hostName;
         const httpUser = webspace.webspaceName;
         core.setOutput('ssh-user', sshUser);
