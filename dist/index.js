@@ -33412,9 +33412,9 @@ async function run() {
             const databaseInternalName = `${databasePrefix}--${databaseName.toLowerCase()}`;
             const existingDatabase = foundDatabases.find(d => d.name === databaseInternalName) ?? null;
             if (null !== existingDatabase) {
-                core.info(`Granting access on database ${databaseInternalName}`);
                 const usersWithAccess = await findDatabaseAccesses(webspaceName, existingDatabase.id);
                 if (!usersWithAccess.length) {
+                    core.info(`Granting access on database ${databaseInternalName}`);
                     const { database, databaseUserName, databasePassword } = await addDatabaseAccess(existingDatabase, webspaceName);
                     Object.assign(Object.fromEntries([
                         [
