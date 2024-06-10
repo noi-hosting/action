@@ -234,6 +234,7 @@ export async function run(): Promise<void> {
 
     core.info('web')
     core.info(JSON.stringify(app.web))
+    core.info(JSON.stringify(app))
     core.info(JSON.stringify(manifest))
 
     const foundVhosts: VhostResult[] = await findVhostByWebspace(webspaceName)

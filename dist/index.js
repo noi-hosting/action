@@ -29281,6 +29281,7 @@ async function run() {
         core.setOutput('http-user', httpUser);
         core.info('web');
         core.info(JSON.stringify(app.web));
+        core.info(JSON.stringify(app));
         core.info(JSON.stringify(manifest));
         const foundVhosts = await findVhostByWebspace(webspaceName);
         for (const [domainName, web] of Object.entries(app.web)) {
