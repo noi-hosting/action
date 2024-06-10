@@ -33663,7 +33663,7 @@ async function createDatabaseUser(webspaceName) {
     return { user: response.result.response, password };
 }
 function transformPhpIni(ini) {
-    return Object.entries(ini).map(([k, v]) => ({ key: k, value: v }));
+    return Object.entries(ini).map(([k, v]) => ({ key: k, value: `${v}` }));
 }
 async function createVhost(webspace, web, app, domainName, webRoot) {
     const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/vhostCreate', {

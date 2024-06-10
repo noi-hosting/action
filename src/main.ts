@@ -660,7 +660,7 @@ async function createDatabaseUser(
 }
 
 function transformPhpIni(ini: object): object {
-  return Object.entries(ini).map(([k, v]) => ({ key: k, value: v }))
+  return Object.entries(ini).map(([k, v]) => ({ key: k, value: `${v}` }))
 }
 
 async function createVhost(
