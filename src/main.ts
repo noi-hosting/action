@@ -186,9 +186,7 @@ export async function run(): Promise<void> {
     })
     const webspaceName: string = `${webspacePrefix}-${appKey}-${ref}`.trim()
     const databasePrefix: string = `${webspacePrefix}-${ref}`.trim()
-    const webRoot: string = webspaceName
-      .toLowerCase()
-      .replace(/[^a-z0-9-/]/, '')
+    const webRoot: string = webspaceName.toLowerCase().replace(/[^a-z0-9-]/, '')
     const manifest: Manifest = yaml.load(
       fs.readFileSync('./.hosting/config.yaml', 'utf8')
     ) as Manifest
@@ -712,52 +710,19 @@ async function createVhost(
             managedSslProductCode: 'ssl-letsencrypt-dv-3m'
           }
         },
-        phpIni: transformPhpIni(app.php?.ini ?? {})
+        phpIni: {
+          values: transformPhpIni(app.php?.ini ?? {})
+        }
       }
     )
 
   core.info(
     JSON.stringify({
-      authToken: token,
-      vhost: {
-        domainName,
-        serverType: 'nginx',
-        webspaceId: webspace.id,
-        enableAlias: false,
-        additionalDomainNames: web.alias ?? [],
-        enableSystemAlias: web.previewDomain ?? false,
-        redirectToPrimaryName: web.redirect ?? true,
-        phpVersion: app.php?.version,
-        webRoot: `${webRoot}/current/${web.root ?? ''}`.replace(/\/$/, ''),
-        locations: Object.entries(web.locations ?? {}).map(function ([
-          matchString,
-          location
-        ]) {
-          return {
-            matchString,
-            matchType: matchString.startsWith('^')
-              ? 'regex'
-              : matchString.startsWith('/')
-                ? 'directory'
-                : 'default',
-            locationType: location.allow ?? true ? 'location' : 'denyLocation',
-            mapScript:
-              typeof (location.passthru ?? false) === 'string'
-                ? location.passthru
-                : '',
-            phpEnabled: false !== (location.passthru ?? false)
-          }
-        }),
-        sslSettings: {
-          profile: 'modern',
-          managedSslProductCode: 'ssl-letsencrypt-dv-3m'
-        }
-      },
-      phpIni: transformPhpIni(app.php?.ini ?? {})
+      phpIni: {
+        values: transformPhpIni(app.php?.ini ?? {})
+      }
     })
   )
-
-  core.info(JSON.stringify(response.result))
 
   if (null === response.result) {
     throw new Error('Unexpected error')

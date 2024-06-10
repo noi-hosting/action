@@ -33352,9 +33352,7 @@ async function run() {
         });
         const webspaceName = `${webspacePrefix}-${appKey}-${ref}`.trim();
         const databasePrefix = `${webspacePrefix}-${ref}`.trim();
-        const webRoot = webspaceName
-            .toLowerCase()
-            .replace(/[^a-z0-9-/]/, '');
+        const webRoot = webspaceName.toLowerCase().replace(/[^a-z0-9-]/, '');
         const manifest = yaml.load(fs.readFileSync('./.hosting/config.yaml', 'utf8'));
         const app = manifest.applications[appKey] ?? null;
         if (null === app) {
@@ -33700,43 +33698,15 @@ async function createVhost(webspace, web, app, domainName, webRoot) {
                 managedSslProductCode: 'ssl-letsencrypt-dv-3m'
             }
         },
-        phpIni: transformPhpIni(app.php?.ini ?? {})
+        phpIni: {
+            values: transformPhpIni(app.php?.ini ?? {})
+        }
     });
     core.info(JSON.stringify({
-        authToken: token,
-        vhost: {
-            domainName,
-            serverType: 'nginx',
-            webspaceId: webspace.id,
-            enableAlias: false,
-            additionalDomainNames: web.alias ?? [],
-            enableSystemAlias: web.previewDomain ?? false,
-            redirectToPrimaryName: web.redirect ?? true,
-            phpVersion: app.php?.version,
-            webRoot: `${webRoot}/current/${web.root ?? ''}`.replace(/\/$/, ''),
-            locations: Object.entries(web.locations ?? {}).map(function ([matchString, location]) {
-                return {
-                    matchString,
-                    matchType: matchString.startsWith('^')
-                        ? 'regex'
-                        : matchString.startsWith('/')
-                            ? 'directory'
-                            : 'default',
-                    locationType: location.allow ?? true ? 'location' : 'denyLocation',
-                    mapScript: typeof (location.passthru ?? false) === 'string'
-                        ? location.passthru
-                        : '',
-                    phpEnabled: false !== (location.passthru ?? false)
-                };
-            }),
-            sslSettings: {
-                profile: 'modern',
-                managedSslProductCode: 'ssl-letsencrypt-dv-3m'
-            }
-        },
-        phpIni: transformPhpIni(app.php?.ini ?? {})
+        phpIni: {
+            values: transformPhpIni(app.php?.ini ?? {})
+        }
     }));
-    core.info(JSON.stringify(response.result));
     if (null === response.result) {
         throw new Error('Unexpected error');
     }
