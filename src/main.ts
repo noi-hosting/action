@@ -393,8 +393,17 @@ async function findOneWebspaceByName(
         authToken: token,
         limit: 1,
         filter: {
-          field: 'webspaceName',
-          value: webspaceName
+          subFilterConnective: 'AND',
+          subFilter: [
+            {
+              field: 'webspaceName',
+              value: webspaceName
+            },
+            {
+              field: 'webspaceStatus',
+              value: 'success'
+            }
+          ]
         }
       }
     )
