@@ -33577,6 +33577,9 @@ async function createWebspace(manifest, name) {
     if (null === response.result) {
         throw new Error('Unexpected error');
     }
+    if ('error' === (response.result.status ?? null)) {
+        throw new Error(JSON.stringify(response.result.errors ?? []));
+    }
     return response.result.response;
 }
 async function createDatabase(manifest, webspaceName, databaseName) {
@@ -33598,6 +33601,9 @@ async function createDatabase(manifest, webspaceName, databaseName) {
     });
     if (null === response.result) {
         throw new Error('Unexpected error');
+    }
+    if ('error' === (response.result.status ?? null)) {
+        throw new Error(JSON.stringify(response.result.errors ?? []));
     }
     return {
         database: response.result.response,
@@ -33625,6 +33631,9 @@ async function addDatabaseAccess(database, webspaceName) {
     if (null === response.result) {
         throw new Error('Unexpected error');
     }
+    if ('error' === (response.result.status ?? null)) {
+        throw new Error(JSON.stringify(response.result.errors ?? []));
+    }
     return {
         database: response.result.response,
         databaseUserName: user.dbUserName,
@@ -33645,6 +33654,9 @@ async function createWebspaceUser() {
     if (null === response.result) {
         throw new Error('Unexpected error');
     }
+    if ('error' === (response.result.status ?? null)) {
+        throw new Error(JSON.stringify(response.result.errors ?? []));
+    }
     return response.result.response;
 }
 async function createDatabaseUser(webspaceName) {
@@ -33659,6 +33671,9 @@ async function createDatabaseUser(webspaceName) {
     });
     if (null === response.result) {
         throw new Error('Unexpected error');
+    }
+    if ('error' === (response.result.status ?? null)) {
+        throw new Error(JSON.stringify(response.result.errors ?? []));
     }
     return { user: response.result.response, password };
 }
@@ -33686,7 +33701,7 @@ async function createVhost(webspace, web, app, domainName, webRoot) {
                         : matchString.startsWith('/')
                             ? 'directory'
                             : 'default',
-                    locationType: location.allow ?? true ? 'location' : 'denyLocation',
+                    locationType: location.allow ?? true ? 'generic' : 'blockAccess',
                     mapScript: typeof (location.passthru ?? false) === 'string'
                         ? location.passthru
                         : '',
@@ -33705,6 +33720,9 @@ async function createVhost(webspace, web, app, domainName, webRoot) {
     core.info(JSON.stringify(response.result));
     if (null === response.result) {
         throw new Error('Unexpected error');
+    }
+    if ('error' === (response.result.status ?? null)) {
+        throw new Error(JSON.stringify(response.result.errors ?? []));
     }
     return response.result.response;
 }

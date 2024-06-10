@@ -521,6 +521,10 @@ async function createWebspace(
     throw new Error('Unexpected error')
   }
 
+  if ('error' === (response.result.status ?? null)) {
+    throw new Error(JSON.stringify(response.result.errors ?? []))
+  }
+
   return response.result.response
 }
 
@@ -558,6 +562,10 @@ async function createDatabase(
 
   if (null === response.result) {
     throw new Error('Unexpected error')
+  }
+
+  if ('error' === (response.result.status ?? null)) {
+    throw new Error(JSON.stringify(response.result.errors ?? []))
   }
 
   return {
@@ -601,6 +609,10 @@ async function addDatabaseAccess(
     throw new Error('Unexpected error')
   }
 
+  if ('error' === (response.result.status ?? null)) {
+    throw new Error(JSON.stringify(response.result.errors ?? []))
+  }
+
   return {
     database: response.result.response,
     databaseUserName: user.dbUserName,
@@ -630,6 +642,10 @@ async function createWebspaceUser(): Promise<WebspaceUserResult> {
     throw new Error('Unexpected error')
   }
 
+  if ('error' === (response.result.status ?? null)) {
+    throw new Error(JSON.stringify(response.result.errors ?? []))
+  }
+
   return response.result.response
 }
 
@@ -654,6 +670,10 @@ async function createDatabaseUser(
 
   if (null === response.result) {
     throw new Error('Unexpected error')
+  }
+
+  if ('error' === (response.result.status ?? null)) {
+    throw new Error(JSON.stringify(response.result.errors ?? []))
   }
 
   return { user: response.result.response, password }
@@ -696,8 +716,7 @@ async function createVhost(
                 : matchString.startsWith('/')
                   ? 'directory'
                   : 'default',
-              locationType:
-                location.allow ?? true ? 'location' : 'denyLocation',
+              locationType: location.allow ?? true ? 'generic' : 'blockAccess',
               mapScript:
                 typeof (location.passthru ?? false) === 'string'
                   ? location.passthru
@@ -720,6 +739,10 @@ async function createVhost(
 
   if (null === response.result) {
     throw new Error('Unexpected error')
+  }
+
+  if ('error' === (response.result.status ?? null)) {
+    throw new Error(JSON.stringify(response.result.errors ?? []))
   }
 
   return response.result.response
