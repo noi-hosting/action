@@ -219,8 +219,11 @@ export async function run(): Promise<void> {
       } while ('active' !== webspace.status)
     }
 
+    const availableUsers = await findWebspaceUsers()
     const webspaceAccess: WebspaceAccess | null =
-      webspace.accesses.find(a => a.sshAccess) ?? null
+      webspace.accesses.find(a =>
+        availableUsers.find(u => u.id === a.userId)
+      ) ?? null
     const sshUser = webspaceAccess?.userName
     const sshHost = webspace.hostName
     const httpUser = webspace.webspaceName
@@ -490,11 +493,27 @@ async function findDatabasesByWebspace(
   return response.result?.response?.data ?? []
 }
 
+async function findWebspaceUsers(): Promise<WebspaceUserResult[]> {
+  const response: TypedResponse<ApiFindResponse<WebspaceUserResult>> =
+    await _http.postJson(
+      'https://secure.hosting.de/api/webhosting/v1/json/usersFind',
+      {
+        authToken: token,
+        filter: {
+          field: 'userName',
+          value: 'github-action--*'
+        }
+      }
+    )
+
+  return response.result?.response?.data ?? []
+}
+
 async function createWebspace(
   manifest: ManifestApp,
   name: string
 ): Promise<WebspaceResult> {
-  const user = await createWebspaceUser()
+  const user = await createWebspaceUser(name)
 
   const response: TypedResponse<ApiActionResponse<WebspaceResult>> =
     await _http.postJson(
@@ -624,7 +643,9 @@ async function addDatabaseAccess(
   }
 }
 
-async function createWebspaceUser(): Promise<WebspaceUserResult> {
+async function createWebspaceUser(
+  webspaceName: string
+): Promise<WebspaceUserResult> {
   const sshKey: string = core.getInput('ssh-public-key', { required: true })
 
   const response: TypedResponse<ApiActionResponse<WebspaceUserResult>> =
@@ -634,7 +655,7 @@ async function createWebspaceUser(): Promise<WebspaceUserResult> {
         authToken: token,
         user: {
           sshKey,
-          name: 'github-action',
+          name: `github-action--${webspaceName}`,
           comment:
             'Created by setup-hostingde github action. Please do not remove.'
         },

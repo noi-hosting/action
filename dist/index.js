@@ -33377,7 +33377,8 @@ async function run() {
                 webspace = foundWebspace;
             } while ('active' !== webspace.status);
         }
-        const webspaceAccess = webspace.accesses.find(a => a.sshAccess) ?? null;
+        const availableUsers = await findWebspaceUsers();
+        const webspaceAccess = webspace.accesses.find(a => availableUsers.find(u => u.id === a.userId)) ?? null;
         const sshUser = webspaceAccess?.userName;
         const sshHost = webspace.hostName;
         const httpUser = webspace.webspaceName;
@@ -33556,8 +33557,18 @@ async function findDatabasesByWebspace(databasePrefix) {
     });
     return response.result?.response?.data ?? [];
 }
+async function findWebspaceUsers() {
+    const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/usersFind', {
+        authToken: token,
+        filter: {
+            field: 'userName',
+            value: 'github-action--*'
+        }
+    });
+    return response.result?.response?.data ?? [];
+}
 async function createWebspace(manifest, name) {
-    const user = await createWebspaceUser();
+    const user = await createWebspaceUser(name);
     const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/webspaceCreate', {
         authToken: token,
         webspace: {
@@ -33643,13 +33654,13 @@ async function addDatabaseAccess(database, webspaceName) {
         databasePassword: password
     };
 }
-async function createWebspaceUser() {
+async function createWebspaceUser(webspaceName) {
     const sshKey = core.getInput('ssh-public-key', { required: true });
     const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/userCreate', {
         authToken: token,
         user: {
             sshKey,
-            name: 'github-action',
+            name: `github-action--${webspaceName}`,
             comment: 'Created by setup-hostingde github action. Please do not remove.'
         },
         password: crypto_1.default.randomUUID()
