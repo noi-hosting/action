@@ -33561,10 +33561,18 @@ async function findDatabaseAccesses(webspaceName, databaseId) {
 async function findDatabasesByWebspace(databasePrefix) {
     const response = await _http.postJson('https://secure.hosting.de/api/database/v1/json/databasesFind', {
         authToken: token,
-        limit: 1,
         filter: {
-            field: 'databaseName',
-            value: `${databasePrefix}--*`
+            subFilterConnective: 'AND',
+            subFilter: [
+                {
+                    field: 'databaseName',
+                    value: `${databasePrefix}--*`
+                },
+                {
+                    field: 'databaseStatus',
+                    value: 'active'
+                }
+            ]
         }
     });
     return response.result?.response?.data ?? [];

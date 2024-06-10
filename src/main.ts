@@ -497,10 +497,18 @@ async function findDatabasesByWebspace(
       'https://secure.hosting.de/api/database/v1/json/databasesFind',
       {
         authToken: token,
-        limit: 1,
         filter: {
-          field: 'databaseName',
-          value: `${databasePrefix}--*`
+          subFilterConnective: 'AND',
+          subFilter: [
+            {
+              field: 'databaseName',
+              value: `${databasePrefix}--*`
+            },
+            {
+              field: 'databaseStatus',
+              value: 'active'
+            }
+          ]
         }
       }
     )
