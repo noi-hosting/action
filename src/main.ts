@@ -1,7 +1,7 @@
 // noinspection ExceptionCaughtLocallyJS
 
 import * as core from '@actions/core'
-import * as github from '@actions/github'
+// import * as github from '@actions/github'
 import { wait } from './wait'
 import crypto from 'crypto'
 import { HttpClient } from '@actions/http-client'
@@ -179,12 +179,13 @@ interface DatabaseResult {
  */
 export async function run(): Promise<void> {
   try {
-    const ref = github.context.payload.ref ?? 'na'
+    // https://github.com/actions/toolkit/issues/1315
+    const ref = process.env.GITHUB_REF_NAME ?? 'na'
     const appKey: string = core.getInput('app', { required: true })
     const webspacePrefix: string = core.getInput('webspace-prefix', {
       required: true
     })
-    const webspaceName: string = `${webspacePrefix}-${appKey}-${ref}`.trim()
+    const webspaceName: string = `${webspacePrefix}-${ref}-${appKey}`.trim()
     const databasePrefix: string = `${webspacePrefix}-${ref}`.trim()
     const webRoot: string = webspaceName.toLowerCase().replace(/[^a-z0-9-]/, '')
     const manifest: Manifest = yaml.load(
@@ -266,6 +267,8 @@ export async function run(): Promise<void> {
     for (const relict of foundVhosts.filter(
       v => !Object.keys(app.web).includes(v.domainName)
     )) {
+      core.info(`Deleting vHost ${relict.domainName}`)
+
       await deleteVhostById(relict.id)
     }
 
@@ -337,6 +340,15 @@ export async function run(): Promise<void> {
         )
       }
     }
+
+    // const allAvailableDatabaseNames = Object.values(manifest.applications).map(a => Object.values(a.databases ?? {})
+    // for (const relict of foundDatabases.filter(
+    //     v => !allAvailableDatabaseNames.includes(dbprefix - v.name)
+    // )) {
+    //    core.info(`Deleting vHost ${relict.domainName}`)
+
+    //   await deleteVhostById(relict.id)
+    // }
 
     core.setSecret('env-vars')
     core.setOutput('env-vars', envVars)
