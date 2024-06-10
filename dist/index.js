@@ -33614,6 +33614,11 @@ async function createDatabase(manifest, webspaceName, databaseName) {
 }
 async function addDatabaseAccess(database, webspaceName) {
     const { user, password } = await createDatabaseUser(webspaceName);
+    const accesses = database.accesses;
+    accesses.push({
+        userId: user.id,
+        accessLevel: ['read', 'write', 'schema']
+    });
     const response = await _http.postJson('https://secure.hosting.de/api/database/v1/json/databaseUpdate', {
         authToken: token,
         database: {
@@ -33624,25 +33629,8 @@ async function addDatabaseAccess(database, webspaceName) {
             storageQuota: database.storageQuota,
             comments: database.comments
         },
-        accesses: database.accesses.push({
-            userId: user.id,
-            accessLevel: ['read', 'write', 'schema']
-        })
+        accesses
     });
-    core.info(JSON.stringify({
-        database: {
-            id: database.id,
-            name: database.name,
-            productCode: database.productCode,
-            forceSsl: database.forceSsl,
-            storageQuota: database.storageQuota,
-            comments: database.comments
-        },
-        accesses: database.accesses.push({
-            userId: user.id,
-            accessLevel: ['read', 'write', 'schema']
-        })
-    }));
     if (null === response.result) {
         throw new Error('Unexpected error');
     }

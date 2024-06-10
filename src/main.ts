@@ -586,6 +586,11 @@ async function addDatabaseAccess(
   databasePassword: string
 }> {
   const { user, password } = await createDatabaseUser(webspaceName)
+  const accesses = database.accesses
+  accesses.push({
+    userId: user.id,
+    accessLevel: ['read', 'write', 'schema']
+  })
 
   const response: TypedResponse<ApiActionResponse<DatabaseResult>> =
     await _http.postJson(
@@ -600,29 +605,9 @@ async function addDatabaseAccess(
           storageQuota: database.storageQuota,
           comments: database.comments
         },
-        accesses: database.accesses.push({
-          userId: user.id,
-          accessLevel: ['read', 'write', 'schema']
-        })
+        accesses
       }
     )
-
-  core.info(
-    JSON.stringify({
-      database: {
-        id: database.id,
-        name: database.name,
-        productCode: database.productCode,
-        forceSsl: database.forceSsl,
-        storageQuota: database.storageQuota,
-        comments: database.comments
-      },
-      accesses: database.accesses.push({
-        userId: user.id,
-        accessLevel: ['read', 'write', 'schema']
-      })
-    })
-  )
 
   if (null === response.result) {
     throw new Error('Unexpected error')
