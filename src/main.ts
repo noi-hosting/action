@@ -401,7 +401,7 @@ async function findOneWebspaceByName(
             },
             {
               field: 'webspaceStatus',
-              value: 'success'
+              value: 'active'
             }
           ]
         }
@@ -485,25 +485,6 @@ async function findDatabaseAccesses(
         }
       }
     )
-
-  core.info(
-    JSON.stringify({
-      authToken: token,
-      filter: {
-        subFilterConnective: 'AND',
-        subFilter: [
-          {
-            field: 'userName',
-            value: webspaceName
-          },
-          {
-            field: 'userAccessesDatabaseId',
-            value: databaseId
-          }
-        ]
-      }
-    })
-  )
 
   return response.result?.response?.data ?? []
 }

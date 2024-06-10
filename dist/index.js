@@ -33502,7 +33502,7 @@ async function findOneWebspaceByName(webspaceName) {
                 },
                 {
                     field: 'webspaceStatus',
-                    value: 'success'
+                    value: 'active'
                 }
             ]
         }
@@ -33556,22 +33556,6 @@ async function findDatabaseAccesses(webspaceName, databaseId) {
             ]
         }
     });
-    core.info(JSON.stringify({
-        authToken: token,
-        filter: {
-            subFilterConnective: 'AND',
-            subFilter: [
-                {
-                    field: 'userName',
-                    value: webspaceName
-                },
-                {
-                    field: 'userAccessesDatabaseId',
-                    value: databaseId
-                }
-            ]
-        }
-    }));
     return response.result?.response?.data ?? [];
 }
 async function findDatabasesByWebspace(databasePrefix) {
