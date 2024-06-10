@@ -607,6 +607,23 @@ async function addDatabaseAccess(
       }
     )
 
+  core.info(
+    JSON.stringify({
+      database: {
+        id: database.id,
+        name: database.name,
+        productCode: database.productCode,
+        forceSsl: database.forceSsl,
+        storageQuota: database.storageQuota,
+        comments: database.comments
+      },
+      accesses: database.accesses.push({
+        userId: user.id,
+        accessLevel: ['read', 'write', 'schema']
+      })
+    })
+  )
+
   if (null === response.result) {
     throw new Error('Unexpected error')
   }
