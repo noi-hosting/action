@@ -33628,6 +33628,7 @@ async function addDatabaseAccess(database, webspaceName) {
     const accesses = database.accesses;
     accesses.push({
         userId: user.id,
+        databaseId: database.id,
         accessLevel: ['read', 'write', 'schema']
     });
     const response = await _http.postJson('https://secure.hosting.de/api/database/v1/json/databaseUpdate', {

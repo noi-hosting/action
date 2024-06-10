@@ -608,6 +608,7 @@ async function addDatabaseAccess(
   const accesses = database.accesses
   accesses.push({
     userId: user.id,
+    databaseId: database.id,
     accessLevel: ['read', 'write', 'schema']
   })
 
