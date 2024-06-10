@@ -203,14 +203,16 @@ export async function run(): Promise<void> {
       await findOneWebspaceByName(webspaceName)
     if (null !== foundWebspace) {
       webspace = foundWebspace
-      core.info(`Using webspace ${webspace.id}`)
+      core.info(`Using webspace ${webspaceName} (${webspace.id})`)
     } else {
       core.info('Creating a new webspace…')
       webspace = await createWebspace(app, webspaceName)
 
       do {
         await wait(2000)
-        core.info(`Waiting for webspace ${webspace.id} to boot…`)
+        core.info(
+          `Waiting for webspace ${webspaceName} (${webspace.id}) to boot…`
+        )
         foundWebspace = await findWebspaceById(webspace.id)
         if (null === foundWebspace) {
           break
@@ -229,6 +231,10 @@ export async function run(): Promise<void> {
     core.setOutput('ssh-host', sshHost)
     core.setOutput('ssh-port', 2244)
     core.setOutput('http-user', httpUser)
+
+    core.info('web')
+    core.info(JSON.stringify(app.web))
+    core.info(JSON.stringify(manifest))
 
     const foundVhosts: VhostResult[] = await findVhostByWebspace(webspaceName)
     for (const [domainName, web] of Object.entries(app.web)) {
