@@ -6,7 +6,7 @@ import { wait } from './wait'
 import crypto from 'crypto'
 import { HttpClient } from '@actions/http-client'
 import * as fs from 'fs'
-import { parse } from 'yaml'
+import * as yaml from 'js-yaml'
 import { TypedResponse } from '@actions/http-client/lib/interfaces'
 
 const _http = new HttpClient()
@@ -189,9 +189,9 @@ export async function run(): Promise<void> {
     const webRoot: string = webspaceName
       .toLowerCase()
       .replace(/[^a-z0-9-/]/, '')
-    const manifest: Manifest = parse(
+    const manifest: Manifest = yaml.load(
       fs.readFileSync('./.hosting/config.yaml', 'utf8')
-    )
+    ) as Manifest
     const app = manifest.applications[appKey] ?? null
     if (null === app) {
       throw new Error(
