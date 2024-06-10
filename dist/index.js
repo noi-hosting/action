@@ -33589,7 +33589,8 @@ async function createDatabase(manifest, webspaceName, databaseName) {
         database: {
             name: databaseName,
             comments: 'Created by setup-hostingde github action. Please do not change name.',
-            productCode: 'database-mariadb-single-v1-1m'
+            productCode: 'database-mariadb-single-v1-1m',
+            storageQuota: 512
         },
         accesses: [
             {
@@ -33717,7 +33718,6 @@ async function createVhost(webspace, web, app, domainName, webRoot) {
             values: transformPhpIni(app.php?.ini ?? {})
         }
     });
-    core.info(JSON.stringify(response.result));
     if (null === response.result) {
         throw new Error('Unexpected error');
     }
