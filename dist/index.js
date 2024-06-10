@@ -29223,9 +29223,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = void 0;
 const core = __importStar(__nccwpck_require__(2186));
+const github = __importStar(__nccwpck_require__(5438));
 const wait_1 = __nccwpck_require__(5259);
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
-const github_1 = __importDefault(__nccwpck_require__(5438));
 const http_client_1 = __nccwpck_require__(6255);
 const fs = __importStar(__nccwpck_require__(7147));
 const yaml_1 = __nccwpck_require__(4083);
@@ -29237,12 +29237,13 @@ const token = core.getInput('auth-token', { required: true });
  */
 async function run() {
     try {
+        const ref = github.context.payload.ref ?? 'na';
         const appKey = core.getInput('app', { required: true });
         const webspacePrefix = core.getInput('webspace-prefix', {
             required: true
         });
-        const webspaceName = `${webspacePrefix}-${appKey}-${github_1.default.context.payload.ref}`.trim();
-        const databasePrefix = `${webspacePrefix}-${github_1.default.context.payload.ref}`.trim();
+        const webspaceName = `${webspacePrefix}-${appKey}-${ref}`.trim();
+        const databasePrefix = `${webspacePrefix}-${ref}`.trim();
         const webRoot = webspaceName
             .toLowerCase()
             .replace(/[^a-z0-9-/]/, '');

@@ -1,9 +1,9 @@
 // noinspection ExceptionCaughtLocallyJS
 
 import * as core from '@actions/core'
+import * as github from '@actions/github'
 import { wait } from './wait'
 import crypto from 'crypto'
-import github from '@actions/github'
 import { HttpClient } from '@actions/http-client'
 import * as fs from 'fs'
 import { parse } from 'yaml'
@@ -179,14 +179,13 @@ interface DatabaseResult {
  */
 export async function run(): Promise<void> {
   try {
+    const ref = github.context.payload.ref ?? 'na'
     const appKey: string = core.getInput('app', { required: true })
     const webspacePrefix: string = core.getInput('webspace-prefix', {
       required: true
     })
-    const webspaceName: string =
-      `${webspacePrefix}-${appKey}-${github.context.payload.ref}`.trim()
-    const databasePrefix: string =
-      `${webspacePrefix}-${github.context.payload.ref}`.trim()
+    const webspaceName: string = `${webspacePrefix}-${appKey}-${ref}`.trim()
+    const databasePrefix: string = `${webspacePrefix}-${ref}`.trim()
     const webRoot: string = webspaceName
       .toLowerCase()
       .replace(/[^a-z0-9-/]/, '')
