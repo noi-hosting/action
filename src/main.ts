@@ -23,6 +23,7 @@ interface Manifest {
 
 interface ManifestApp {
   pool?: string
+  account?: string
   php?: {
     version?: string
     ini?: {
@@ -203,8 +204,10 @@ export async function run(): Promise<void> {
     if (null !== foundWebspace) {
       webspace = foundWebspace
       core.info(`Using webspace ${webspaceName} (${webspace.id})`)
+      core.setOutput('shall-sync', false)
     } else {
       core.info('Creating a new webspace…')
+      core.setOutput('shall-sync', true)
       webspace = await createWebspace(app, webspaceName)
 
       do {
@@ -560,7 +563,8 @@ async function createWebspace(
           comments:
             'Created by setup-hostingde github action. Please do not change name.',
           productCode: 'webhosting-webspace-v1-1m',
-          cronJobs: []
+          cronJobs: [],
+          accountId: manifest.account ?? null
         },
         accesses: [
           {
@@ -604,7 +608,8 @@ async function createDatabase(
           comments:
             'Created by setup-hostingde github action. Please do not change name.',
           productCode: 'database-mariadb-single-v1-1m',
-          storageQuota: 512
+          storageQuota: 512,
+          accountId: manifest.account ?? null
         },
         accesses: [
           {

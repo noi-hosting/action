@@ -29092,9 +29092,11 @@ async function run() {
         if (null !== foundWebspace) {
             webspace = foundWebspace;
             core.info(`Using webspace ${webspaceName} (${webspace.id})`);
+            core.setOutput('shall-sync', false);
         }
         else {
             core.info('Creating a new webspace…');
+            core.setOutput('shall-sync', true);
             webspace = await createWebspace(app, webspaceName);
             do {
                 await (0, wait_1.wait)(2000);
@@ -29332,7 +29334,8 @@ async function createWebspace(manifest, name) {
             name,
             comments: 'Created by setup-hostingde github action. Please do not change name.',
             productCode: 'webhosting-webspace-v1-1m',
-            cronJobs: []
+            cronJobs: [],
+            accountId: manifest.account ?? null
         },
         accesses: [
             {
@@ -29358,7 +29361,8 @@ async function createDatabase(manifest, webspaceName, databaseName) {
             name: databaseName,
             comments: 'Created by setup-hostingde github action. Please do not change name.',
             productCode: 'database-mariadb-single-v1-1m',
-            storageQuota: 512
+            storageQuota: 512,
+            accountId: manifest.account ?? null
         },
         accesses: [
             {
