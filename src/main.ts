@@ -15,6 +15,7 @@ const token = core.getInput('auth-token', { required: true })
 interface Manifest {
   project?: {
     parent?: string
+    previewDomain?: string
   }
   applications: {
     [app: string]: ManifestApp
@@ -39,16 +40,17 @@ interface ManifestApp {
 }
 
 interface ManifestAppWeb {
-  alias?: string[]
   root?: string
-  redirect?: boolean
-  previewDomain?: boolean
+  www?: boolean
   locations: {
     [matchString: string]: {
       passthru?: string | boolean
       expires?: boolean
       allow?: boolean
     }
+  }
+  environments: {
+    [environment: string]: string
   }
 }
 
@@ -206,14 +208,14 @@ export async function run(): Promise<void> {
       core.info(`Using webspace ${webspaceName} (${webspace.id})`)
       core.setOutput('shall-sync', false)
     } else {
-      core.info('Creating a new webspace…')
+      core.info('Creating a new webspace...')
       core.setOutput('shall-sync', true)
       webspace = await createWebspace(app, webspaceName)
 
       do {
         await wait(2000)
         core.info(
-          `Waiting for webspace ${webspaceName} (${webspace.id}) to boot…`
+          `Waiting for webspace ${webspaceName} (${webspace.id}) to boot...`
         )
         foundWebspace = await findWebspaceById(webspace.id)
         if (null === foundWebspace) {
@@ -245,32 +247,32 @@ export async function run(): Promise<void> {
 
     const foundVhosts: VhostResult[] = await findVhostByWebspace(webspace.id)
     for (const [domainName, web] of Object.entries(app.web)) {
-      const foundVhost =
-        foundVhosts.find(v => v.domainName === domainName) ?? null
-      let vhost: VhostResult
-      if (null === foundVhost) {
-        core.info(`Creating a vHost for ${domainName}`)
-        vhost = await createVhost(webspace, web, app, domainName, webRoot)
-      } else {
-        vhost = foundVhost
-        if (mustBeUpdated(vhost, app, web, webRoot)) {
-          core.info(`Updating vHost for ${domainName}`)
+      const actualDomainName = translateDomainName(
+        domainName,
+        ref,
+        manifest,
+        web,
+        appKey
+      )
 
-          // todo
-        }
+      let vhost =
+        foundVhosts.find(v => v.domainName === actualDomainName) ?? null
+      if (null === vhost) {
+        core.info(`Configuring ${actualDomainName}...`)
+        vhost = await createVhost(webspace, web, app, actualDomainName, webRoot)
+      } else if (mustBeUpdated(vhost, app, web, webRoot)) {
+        core.info(`Configuring ${actualDomainName}...`)
+        // todo
       }
 
       core.setOutput('deploy-path', `/home/${httpUser}/html/${webRoot}`)
-      core.setOutput(
-        'public-url',
-        `https://${vhost.enableSystemAlias ? vhost.systemAlias : vhost.domainName}`
-      )
+      core.setOutput('public-url', `https://${vhost.domainName}`)
     }
 
     for (const relict of foundVhosts.filter(
       v => !Object.keys(app.web).includes(v.domainName)
     )) {
-      core.info(`Deleting vHost ${relict.domainName}`)
+      core.info(`Deleting ${relict.domainName}...`)
 
       await deleteVhostById(relict.id)
     }
@@ -360,6 +362,34 @@ export async function run(): Promise<void> {
   }
 }
 
+function translateDomainName(
+  domainName: string,
+  environment: string,
+  manifest: Manifest,
+  web: ManifestAppWeb,
+  app: string
+): string {
+  if (environment === (manifest.project?.parent ?? '')) {
+    return domainName
+  }
+
+  if (null !== (web.environments ?? null) && environment in web.environments) {
+    return web.environments[environment]
+  }
+
+  const ref = process.env.GITHUB_REF_NAME ?? 'na'
+
+  if (null !== (manifest.project?.previewDomain ?? null)) {
+    // @ts-expect-error manifest.project can be null but actually not really
+    return manifest.project.previewDomain.replace(
+      /\{(app|ref)}/gi,
+      (matched: string): string => ({ app, ref })[matched] ?? ''
+    )
+  }
+
+  return domainName
+}
+
 function mustBeUpdated(
   vhost: VhostResult,
   app: ManifestApp,
@@ -372,24 +402,13 @@ function mustBeUpdated(
 
   // todo phpini
 
-  if (
-    web.alias?.length !== vhost.additionalDomainNames.length ||
-    web.alias.every((v, i) => v !== vhost.additionalDomainNames[i])
-  ) {
+  if ((web.www ?? true) !== vhost.enableAlias) {
     return true
   }
 
   if (
     `${webRoot}/current/${web.root ?? ''}`.replace(/\/$/, '') !== vhost.webRoot
   ) {
-    return true
-  }
-
-  if (vhost.redirectToPrimaryName !== web.redirect ?? true) {
-    return true
-  }
-
-  if (vhost.enableSystemAlias !== web.previewDomain ?? false) {
     return true
   }
 
@@ -765,10 +784,8 @@ async function createVhost(
           domainName,
           serverType: 'nginx',
           webspaceId: webspace.id,
-          enableAlias: false,
-          additionalDomainNames: web.alias ?? [],
-          enableSystemAlias: web.previewDomain ?? false,
-          redirectToPrimaryName: web.redirect ?? true,
+          enableAlias: web.www ?? true,
+          redirectToPrimaryName: true,
           phpVersion: app.php?.version,
           webRoot: `${webRoot}/current/${web.root ?? ''}`.replace(/\/$/, ''),
           locations: Object.entries(web.locations ?? {}).map(function ([
