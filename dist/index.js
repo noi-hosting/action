@@ -29197,7 +29197,7 @@ async function run() {
         }
         const allDatabaseNames = Object.values(manifest.applications).reduce((dbNames, a) => dbNames.concat(Object.values(a.databases ?? {})), []);
         for (const relict of foundDatabases.filter(v => !allDatabaseNames
-            .map(n => `${databasePrefix}--${n.toLowerCase()}`)
+            .map(n => `${databasePrefix}-${n.toLowerCase()}`)
             .includes(v.name))) {
             core.info(`Deleting database ${relict.name}`);
             await deleteDatabaseById(relict.id);
