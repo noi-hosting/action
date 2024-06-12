@@ -496,12 +496,12 @@ async function findVhostByWebspace(webspaceId: string): Promise<VhostResult[]> {
 }
 
 async function findDatabaseAccesses(
-  webspaceName: string,
+  userName: string,
   databaseId: string
 ): Promise<DatabaseUserResult[]> {
   const response: TypedResponse<ApiFindResponse<DatabaseUserResult>> =
     await _http.postJson(
-      'https://secure.hosting.de/api/webhosting/v1/json/usersFind',
+      'https://secure.hosting.de/api/database/v1/json/usersFind',
       {
         authToken: token,
         filter: {
@@ -509,7 +509,7 @@ async function findDatabaseAccesses(
           subFilter: [
             {
               field: 'userName',
-              value: webspaceName
+              value: userName
             },
             {
               field: 'userAccessesDatabaseId',
@@ -519,27 +519,6 @@ async function findDatabaseAccesses(
         }
       }
     )
-
-  core.info(
-    JSON.stringify({
-      authToken: token,
-      filter: {
-        subFilterConnective: 'AND',
-        subFilter: [
-          {
-            field: 'userName',
-            value: webspaceName
-          },
-          {
-            field: 'userAccessesDatabaseId',
-            value: databaseId
-          }
-        ]
-      }
-    })
-  )
-
-  core.info(JSON.stringify(response.result?.response))
 
   return response.result?.response?.data ?? []
 }

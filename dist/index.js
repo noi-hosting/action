@@ -29284,15 +29284,15 @@ async function findVhostByWebspace(webspaceId) {
     });
     return response.result?.response?.data ?? [];
 }
-async function findDatabaseAccesses(webspaceName, databaseId) {
-    const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/usersFind', {
+async function findDatabaseAccesses(userName, databaseId) {
+    const response = await _http.postJson('https://secure.hosting.de/api/database/v1/json/usersFind', {
         authToken: token,
         filter: {
             subFilterConnective: 'AND',
             subFilter: [
                 {
                     field: 'userName',
-                    value: webspaceName
+                    value: userName
                 },
                 {
                     field: 'userAccessesDatabaseId',
@@ -29301,23 +29301,6 @@ async function findDatabaseAccesses(webspaceName, databaseId) {
             ]
         }
     });
-    core.info(JSON.stringify({
-        authToken: token,
-        filter: {
-            subFilterConnective: 'AND',
-            subFilter: [
-                {
-                    field: 'userName',
-                    value: webspaceName
-                },
-                {
-                    field: 'userAccessesDatabaseId',
-                    value: databaseId
-                }
-            ]
-        }
-    }));
-    core.info(JSON.stringify(response.result?.response));
     return response.result?.response?.data ?? [];
 }
 async function findDatabasesByWebspace(databasePrefix) {
