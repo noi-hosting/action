@@ -29214,7 +29214,9 @@ function translateDomainName(domainName, environment, manifest, web, app) {
     const ref = process.env.GITHUB_REF_NAME ?? 'na';
     if (null !== (manifest.project?.previewDomain ?? null)) {
         // @ts-expect-error manifest.project can be null but actually not really
-        return manifest.project.previewDomain.replace(/\{(app|ref)}/gi, (matched) => ({ app, ref })[matched] ?? '');
+        return manifest.project.previewDomain
+            .replace(/\{app}/gi, app)
+            .replace(/\{ref}/gi, ref);
     }
     return domainName;
 }
