@@ -29469,6 +29469,7 @@ async function createVhost(webspace, web, app, domainName, webRoot) {
             webspaceId: webspace.id,
             enableAlias: web.www ?? true,
             redirectToPrimaryName: true,
+            redirectHttpToHttps: true,
             phpVersion: app.php?.version,
             webRoot: `${webRoot}/current/${web.root ?? ''}`.replace(/\/$/, ''),
             locations: Object.entries(web.locations ?? {}).map(function ([matchString, location]) {

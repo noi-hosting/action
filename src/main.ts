@@ -137,6 +137,7 @@ interface VhostResult {
   additionalDomainNames: string[]
   enableAlias: boolean
   redirectToPrimaryName: boolean
+  redirectHttpToHttps: boolean
   enableSystemAlias: boolean
   systemAlias: string
   webRoot: string
@@ -786,6 +787,7 @@ async function createVhost(
           webspaceId: webspace.id,
           enableAlias: web.www ?? true,
           redirectToPrimaryName: true,
+          redirectHttpToHttps: true,
           phpVersion: app.php?.version,
           webRoot: `${webRoot}/current/${web.root ?? ''}`.replace(/\/$/, ''),
           locations: Object.entries(web.locations ?? {}).map(function ([
