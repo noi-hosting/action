@@ -361,8 +361,8 @@ export async function run(): Promise<void> {
     //   await deleteVhostById(relict.id)
     // }
 
+    core.setOutput('env-vars', envVars)
     core.setSecret('env-vars')
-    core.setOutput('env-vars', JSON.stringify(envVars))
   } catch (error) {
     if (error instanceof Error) core.setFailed(error.message)
   }
