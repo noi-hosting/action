@@ -29301,6 +29301,23 @@ async function findDatabaseAccesses(webspaceName, databaseId) {
             ]
         }
     });
+    core.info(JSON.stringify({
+        authToken: token,
+        filter: {
+            subFilterConnective: 'AND',
+            subFilter: [
+                {
+                    field: 'userName',
+                    value: webspaceName
+                },
+                {
+                    field: 'userAccessesDatabaseId',
+                    value: databaseId
+                }
+            ]
+        }
+    }));
+    core.info(JSON.stringify(response.result?.response));
     return response.result?.response?.data ?? [];
 }
 async function findDatabasesByWebspace(databasePrefix) {
