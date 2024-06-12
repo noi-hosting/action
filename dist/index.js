@@ -29149,7 +29149,7 @@ async function run() {
                 if (!usersWithAccess.length) {
                     core.info(`Granting access on database ${databaseInternalName}`);
                     const { database, databaseUserName, databasePassword } = await addDatabaseAccess(existingDatabase, webspaceName);
-                    Object.assign(Object.fromEntries([
+                    Object.assign(envVars, Object.fromEntries([
                         [
                             `${relationName.toUpperCase()}_SERVER`,
                             `mysql://${database.hostName}`
@@ -29164,13 +29164,13 @@ async function run() {
                             `${relationName.toUpperCase()}_URL`,
                             `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
                         ]
-                    ]), envVars);
+                    ]));
                 }
             }
             else {
                 core.info(`Creating database ${databaseInternalName}`);
                 const { database, databaseUserName, databasePassword } = await createDatabase(app, webspaceName, databaseInternalName);
-                Object.assign(Object.fromEntries([
+                Object.assign(envVars, Object.fromEntries([
                     [
                         `${relationName.toUpperCase()}_SERVER`,
                         `mysql://${database.hostName}`
@@ -29185,7 +29185,7 @@ async function run() {
                         `${relationName.toUpperCase()}_URL`,
                         `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
                     ]
-                ]), envVars);
+                ]));
             }
         }
         // const allAvailableDatabaseNames = Object.values(manifest.applications).map(a => Object.values(a.databases ?? {})

@@ -300,6 +300,7 @@ export async function run(): Promise<void> {
             await addDatabaseAccess(existingDatabase, webspaceName)
 
           Object.assign(
+            envVars,
             Object.fromEntries([
               [
                 `${relationName.toUpperCase()}_SERVER`,
@@ -315,8 +316,7 @@ export async function run(): Promise<void> {
                 `${relationName.toUpperCase()}_URL`,
                 `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
               ]
-            ]),
-            envVars
+            ])
           )
         }
       } else {
@@ -326,6 +326,7 @@ export async function run(): Promise<void> {
           await createDatabase(app, webspaceName, databaseInternalName)
 
         Object.assign(
+          envVars,
           Object.fromEntries([
             [
               `${relationName.toUpperCase()}_SERVER`,
@@ -341,8 +342,7 @@ export async function run(): Promise<void> {
               `${relationName.toUpperCase()}_URL`,
               `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
             ]
-          ]),
-          envVars
+          ])
         )
       }
     }
