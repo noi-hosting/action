@@ -29144,13 +29144,14 @@ async function run() {
         const envVars = {};
         const foundDatabases = await findDatabasesByWebspace(databasePrefix);
         for (const [relationName, databaseName] of Object.entries(app.databases ?? {})) {
-            const databaseInternalName = `${databasePrefix}--${databaseName.toLowerCase()}`;
+            const databaseInternalName = `${databasePrefix}-${databaseName.toLowerCase()}`;
+            const dbUserName = `${databasePrefix}-${appKey}--${relationName.toLowerCase()}`;
             const existingDatabase = foundDatabases.find(d => d.name === databaseInternalName) ?? null;
             if (null !== existingDatabase) {
-                const usersWithAccess = await findDatabaseAccesses(webspaceName, existingDatabase.id);
+                const usersWithAccess = await findDatabaseAccesses(dbUserName, existingDatabase.id);
                 if (!usersWithAccess.length) {
                     core.info(`Granting access on database ${databaseInternalName}`);
-                    const { database, databaseUserName, databasePassword } = await addDatabaseAccess(existingDatabase, webspaceName);
+                    const { database, databaseUserName, databasePassword } = await addDatabaseAccess(existingDatabase, dbUserName, app);
                     Object.assign(envVars, Object.fromEntries([
                         [
                             `${relationName.toUpperCase()}_SERVER`,
@@ -29167,12 +29168,13 @@ async function run() {
                             `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
                         ]
                     ]));
+                    core.setSecret(databaseUserName);
                     core.setSecret(databasePassword);
                 }
             }
             else {
                 core.info(`Creating database ${databaseInternalName}`);
-                const { database, databaseUserName, databasePassword } = await createDatabase(app, webspaceName, databaseInternalName);
+                const { database, databaseUserName, databasePassword } = await createDatabase(app, dbUserName, databaseInternalName);
                 Object.assign(envVars, Object.fromEntries([
                     [
                         `${relationName.toUpperCase()}_SERVER`,
@@ -29189,16 +29191,17 @@ async function run() {
                         `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
                     ]
                 ]));
+                core.setSecret(databaseUserName);
                 core.setSecret(databasePassword);
             }
         }
-        // const allAvailableDatabaseNames = Object.values(manifest.applications).map(a => Object.values(a.databases ?? {})
-        // for (const relict of foundDatabases.filter(
-        //     v => !allAvailableDatabaseNames.includes(dbprefix - v.name)
-        // )) {
-        //    core.info(`Deleting vHost ${relict.domainName}`)
-        //   await deleteVhostById(relict.id)
-        // }
+        const allDatabaseNames = Object.values(manifest.applications).reduce((dbNames, a) => dbNames.concat(Object.values(a.databases ?? {})), []);
+        for (const relict of foundDatabases.filter(v => !allDatabaseNames
+            .map(n => `${databasePrefix}--${n.toLowerCase()}`)
+            .includes(v.name))) {
+            core.info(`Deleting database ${relict.name}`);
+            await deleteDatabaseById(relict.id);
+        }
         core.setOutput('env-vars', envVars);
     }
     catch (error) {
@@ -29276,6 +29279,12 @@ async function deleteVhostById(vhostId) {
         vhostId
     });
 }
+async function deleteDatabaseById(databaseId) {
+    await _http.postJson('https://secure.hosting.de/api/database/v1/json/databaseDelete', {
+        authToken: token,
+        databaseId
+    });
+}
 async function findVhostByWebspace(webspaceId) {
     const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/vhostsFind', {
         authToken: token,
@@ -29322,7 +29331,7 @@ async function findDatabasesByWebspace(databasePrefix) {
             subFilter: [
                 {
                     field: 'databaseName',
-                    value: `${databasePrefix}--*`
+                    value: `${databasePrefix}-*`
                 },
                 {
                     field: 'databaseStatus',
@@ -29370,8 +29379,8 @@ async function createWebspace(manifest, name) {
     }
     return response.result.response;
 }
-async function createDatabase(manifest, webspaceName, databaseName) {
-    const { user, password } = await createDatabaseUser(webspaceName);
+async function createDatabase(manifest, dbUserName, databaseName) {
+    const { user, password } = await createDatabaseUser(dbUserName, manifest);
     const response = await _http.postJson('https://secure.hosting.de/api/database/v1/json/databaseCreate', {
         authToken: token,
         database: {
@@ -29401,8 +29410,8 @@ async function createDatabase(manifest, webspaceName, databaseName) {
         databasePassword: password
     };
 }
-async function addDatabaseAccess(database, webspaceName) {
-    const { user, password } = await createDatabaseUser(webspaceName);
+async function addDatabaseAccess(database, dbUserName, manifest) {
+    const { user, password } = await createDatabaseUser(dbUserName, manifest);
     const accesses = database.accesses;
     accesses.push({
         userId: user.id,
@@ -29452,13 +29461,14 @@ async function createWebspaceUser(webspaceName) {
     }
     return response.result.response;
 }
-async function createDatabaseUser(webspaceName) {
+async function createDatabaseUser(dbUserName, manifest) {
     const password = crypto_1.default.randomUUID();
     const response = await _http.postJson('https://secure.hosting.de/api/database/v1/json/userCreate', {
         authToken: token,
         user: {
-            name: webspaceName,
-            comment: 'Created by setup-hostingde github action. Please do not remove.'
+            name: dbUserName,
+            comment: 'Created by setup-hostingde github action. Please do not remove.',
+            accountId: manifest.account ?? null
         },
         password
     });

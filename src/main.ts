@@ -289,20 +289,21 @@ export async function run(): Promise<void> {
     for (const [relationName, databaseName] of Object.entries(
       app.databases ?? {}
     )) {
-      const databaseInternalName = `${databasePrefix}--${databaseName.toLowerCase()}`
+      const databaseInternalName = `${databasePrefix}-${databaseName.toLowerCase()}`
+      const dbUserName = `${databasePrefix}-${appKey}--${relationName.toLowerCase()}`
 
       const existingDatabase =
         foundDatabases.find(d => d.name === databaseInternalName) ?? null
       if (null !== existingDatabase) {
         const usersWithAccess = await findDatabaseAccesses(
-          webspaceName,
+          dbUserName,
           existingDatabase.id
         )
         if (!usersWithAccess.length) {
           core.info(`Granting access on database ${databaseInternalName}`)
 
           const { database, databaseUserName, databasePassword } =
-            await addDatabaseAccess(existingDatabase, webspaceName)
+            await addDatabaseAccess(existingDatabase, dbUserName, app)
 
           Object.assign(
             envVars,
@@ -324,13 +325,14 @@ export async function run(): Promise<void> {
             ])
           )
 
+          core.setSecret(databaseUserName)
           core.setSecret(databasePassword)
         }
       } else {
         core.info(`Creating database ${databaseInternalName}`)
 
         const { database, databaseUserName, databasePassword } =
-          await createDatabase(app, webspaceName, databaseInternalName)
+          await createDatabase(app, dbUserName, databaseInternalName)
 
         Object.assign(
           envVars,
@@ -352,18 +354,25 @@ export async function run(): Promise<void> {
           ])
         )
 
+        core.setSecret(databaseUserName)
         core.setSecret(databasePassword)
       }
     }
 
-    // const allAvailableDatabaseNames = Object.values(manifest.applications).map(a => Object.values(a.databases ?? {})
-    // for (const relict of foundDatabases.filter(
-    //     v => !allAvailableDatabaseNames.includes(dbprefix - v.name)
-    // )) {
-    //    core.info(`Deleting vHost ${relict.domainName}`)
+    const allDatabaseNames = Object.values(manifest.applications).reduce(
+      (dbNames, a) => dbNames.concat(Object.values(a.databases ?? {})),
+      [] as string[]
+    )
+    for (const relict of foundDatabases.filter(
+      v =>
+        !allDatabaseNames
+          .map(n => `${databasePrefix}--${n.toLowerCase()}`)
+          .includes(v.name)
+    )) {
+      core.info(`Deleting database ${relict.name}`)
 
-    //   await deleteVhostById(relict.id)
-    // }
+      await deleteDatabaseById(relict.id)
+    }
 
     core.setOutput('env-vars', envVars)
   } catch (error) {
@@ -485,6 +494,16 @@ async function deleteVhostById(vhostId: string): Promise<void> {
   )
 }
 
+async function deleteDatabaseById(databaseId: string): Promise<void> {
+  await _http.postJson(
+    'https://secure.hosting.de/api/database/v1/json/databaseDelete',
+    {
+      authToken: token,
+      databaseId
+    }
+  )
+}
+
 async function findVhostByWebspace(webspaceId: string): Promise<VhostResult[]> {
   const response: TypedResponse<ApiFindResponse<VhostResult>> =
     await _http.postJson(
@@ -551,7 +570,7 @@ async function findDatabasesByWebspace(
           subFilter: [
             {
               field: 'databaseName',
-              value: `${databasePrefix}--*`
+              value: `${databasePrefix}-*`
             },
             {
               field: 'databaseStatus',
@@ -623,14 +642,14 @@ async function createWebspace(
 
 async function createDatabase(
   manifest: ManifestApp,
-  webspaceName: string,
+  dbUserName: string,
   databaseName: string
 ): Promise<{
   database: DatabaseResult
   databaseUserName: string
   databasePassword: string
 }> {
-  const { user, password } = await createDatabaseUser(webspaceName)
+  const { user, password } = await createDatabaseUser(dbUserName, manifest)
 
   const response: TypedResponse<ApiActionResponse<DatabaseResult>> =
     await _http.postJson(
@@ -672,13 +691,14 @@ async function createDatabase(
 
 async function addDatabaseAccess(
   database: DatabaseResult,
-  webspaceName: string
+  dbUserName: string,
+  manifest: ManifestApp
 ): Promise<{
   database: DatabaseResult
   databaseUserName: string
   databasePassword: string
 }> {
-  const { user, password } = await createDatabaseUser(webspaceName)
+  const { user, password } = await createDatabaseUser(dbUserName, manifest)
   const accesses = database.accesses
   accesses.push({
     userId: user.id,
@@ -750,7 +770,8 @@ async function createWebspaceUser(
 }
 
 async function createDatabaseUser(
-  webspaceName: string
+  dbUserName: string,
+  manifest: ManifestApp
 ): Promise<{ user: DatabaseUserResult; password: string }> {
   const password = crypto.randomUUID()
 
@@ -760,9 +781,10 @@ async function createDatabaseUser(
       {
         authToken: token,
         user: {
-          name: webspaceName,
+          name: dbUserName,
           comment:
-            'Created by setup-hostingde github action. Please do not remove.'
+            'Created by setup-hostingde github action. Please do not remove.',
+          accountId: manifest.account ?? null
         },
         password
       }
