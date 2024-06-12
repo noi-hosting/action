@@ -271,7 +271,12 @@ export async function run(): Promise<void> {
     }
 
     for (const relict of foundVhosts.filter(
-      v => !Object.keys(app.web).includes(v.domainName)
+      v =>
+        !Object.entries(app.web)
+          .map(([domainName, web]) =>
+            translateDomainName(domainName, ref, manifest, web, appKey)
+          )
+          .includes(v.domainName)
     )) {
       core.info(`Deleting ${relict.domainName}...`)
 
@@ -378,13 +383,11 @@ function translateDomainName(
     return web.environments[environment]
   }
 
-  const ref = process.env.GITHUB_REF_NAME ?? 'na'
-
   if (null !== (manifest.project?.previewDomain ?? null)) {
     // @ts-expect-error manifest.project can be null but actually not really
     return manifest.project.previewDomain
       .replace(/\{app}/gi, app)
-      .replace(/\{ref}/gi, ref)
+      .replace(/\{ref}/gi, environment)
   }
 
   return domainName

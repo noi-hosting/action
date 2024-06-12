@@ -29135,7 +29135,9 @@ async function run() {
             core.setOutput('deploy-path', `/home/${httpUser}/html/${webRoot}`);
             core.setOutput('public-url', `https://${vhost.domainName}`);
         }
-        for (const relict of foundVhosts.filter(v => !Object.keys(app.web).includes(v.domainName))) {
+        for (const relict of foundVhosts.filter(v => !Object.entries(app.web)
+            .map(([domainName, web]) => translateDomainName(domainName, ref, manifest, web, appKey))
+            .includes(v.domainName))) {
             core.info(`Deleting ${relict.domainName}...`);
             await deleteVhostById(relict.id);
         }
@@ -29211,12 +29213,11 @@ function translateDomainName(domainName, environment, manifest, web, app) {
     if (null !== (web.environments ?? null) && environment in web.environments) {
         return web.environments[environment];
     }
-    const ref = process.env.GITHUB_REF_NAME ?? 'na';
     if (null !== (manifest.project?.previewDomain ?? null)) {
         // @ts-expect-error manifest.project can be null but actually not really
         return manifest.project.previewDomain
             .replace(/\{app}/gi, app)
-            .replace(/\{ref}/gi, ref);
+            .replace(/\{ref}/gi, environment);
     }
     return domainName;
 }
