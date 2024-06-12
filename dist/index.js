@@ -29167,6 +29167,7 @@ async function run() {
                             `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
                         ]
                     ]));
+                    core.setSecret(databasePassword);
                 }
             }
             else {
@@ -29188,6 +29189,7 @@ async function run() {
                         `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
                     ]
                 ]));
+                core.setSecret(databasePassword);
             }
         }
         // const allAvailableDatabaseNames = Object.values(manifest.applications).map(a => Object.values(a.databases ?? {})
@@ -29198,7 +29200,6 @@ async function run() {
         //   await deleteVhostById(relict.id)
         // }
         core.setOutput('env-vars', envVars);
-        core.setSecret('env-vars');
     }
     catch (error) {
         if (error instanceof Error)

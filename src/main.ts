@@ -323,6 +323,8 @@ export async function run(): Promise<void> {
               ]
             ])
           )
+
+          core.setSecret(databasePassword)
         }
       } else {
         core.info(`Creating database ${databaseInternalName}`)
@@ -349,6 +351,8 @@ export async function run(): Promise<void> {
             ]
           ])
         )
+
+        core.setSecret(databasePassword)
       }
     }
 
@@ -362,7 +366,6 @@ export async function run(): Promise<void> {
     // }
 
     core.setOutput('env-vars', envVars)
-    core.setSecret('env-vars')
   } catch (error) {
     if (error instanceof Error) core.setFailed(error.message)
   }
