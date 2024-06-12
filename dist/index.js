@@ -29278,8 +29278,17 @@ async function findVhostByWebspace(webspaceId) {
     const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/vhostsFind', {
         authToken: token,
         filter: {
-            field: 'webspaceId',
-            value: webspaceId
+            subFilterConnective: 'AND',
+            subFilter: [
+                {
+                    field: 'webspaceId',
+                    value: webspaceId
+                },
+                {
+                    field: 'vHostStatus',
+                    value: 'active'
+                }
+            ]
         }
     });
     return response.result?.response?.data ?? [];

@@ -486,8 +486,17 @@ async function findVhostByWebspace(webspaceId: string): Promise<VhostResult[]> {
       {
         authToken: token,
         filter: {
-          field: 'webspaceId',
-          value: webspaceId
+          subFilterConnective: 'AND',
+          subFilter: [
+            {
+              field: 'webspaceId',
+              value: webspaceId
+            },
+            {
+              field: 'vHostStatus',
+              value: 'active'
+            }
+          ]
         }
       }
     )
