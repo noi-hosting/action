@@ -192,7 +192,6 @@ export async function run(): Promise<void> {
     })
     const webspaceName: string = `${webspacePrefix}-${ref}-${appKey}`.trim()
     const databasePrefix: string = `${webspacePrefix}-${ref}`.trim()
-    const webRoot: string = webspaceName.toLowerCase().replace(/[^a-z0-9-]/, '')
     const manifest: Manifest = yaml.load(
       fs.readFileSync('./.hosting/config.yaml', 'utf8')
     ) as Manifest
@@ -261,13 +260,13 @@ export async function run(): Promise<void> {
         foundVhosts.find(v => v.domainName === actualDomainName) ?? null
       if (null === vhost) {
         core.info(`Configuring ${actualDomainName}...`)
-        vhost = await createVhost(webspace, web, app, actualDomainName, webRoot)
-      } else if (mustBeUpdated(vhost, app, web, webRoot)) {
+        vhost = await createVhost(webspace, web, app, actualDomainName)
+      } else if (mustBeUpdated(vhost, app, web)) {
         core.info(`Configuring ${actualDomainName}...`)
         // todo
       }
 
-      core.setOutput('deploy-path', `/home/${httpUser}/html/${webRoot}`)
+      core.setOutput('deploy-path', `/home/${httpUser}/html}`)
       core.setOutput('public-url', `https://${vhost.domainName}`)
     }
 
@@ -409,8 +408,7 @@ function translateDomainName(
 function mustBeUpdated(
   vhost: VhostResult,
   app: ManifestApp,
-  web: ManifestAppWeb,
-  webRoot: string
+  web: ManifestAppWeb
 ): boolean {
   if (app.php?.version && app.php.version !== vhost.phpVersion) {
     return true
@@ -422,9 +420,7 @@ function mustBeUpdated(
     return true
   }
 
-  if (
-    `${webRoot}/current/${web.root ?? ''}`.replace(/\/$/, '') !== vhost.webRoot
-  ) {
+  if (`current/${web.root ?? ''}`.replace(/\/$/, '') !== vhost.webRoot) {
     return true
   }
 
@@ -816,8 +812,7 @@ async function createVhost(
   webspace: WebspaceResult,
   web: ManifestAppWeb,
   app: ManifestApp,
-  domainName: string,
-  webRoot: string
+  domainName: string
 ): Promise<VhostResult> {
   const response: TypedResponse<ApiActionResponse<VhostResult>> =
     await _http.postJson(
@@ -832,7 +827,7 @@ async function createVhost(
           redirectToPrimaryName: true,
           redirectHttpToHttps: true,
           phpVersion: app.php?.version,
-          webRoot: `${webRoot}/current/${web.root ?? ''}`.replace(/\/$/, ''),
+          webRoot: `current/${web.root ?? ''}`.replace(/\/$/, ''),
           locations: Object.entries(web.locations ?? {}).map(function ([
             matchString,
             location

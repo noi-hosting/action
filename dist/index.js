@@ -29081,7 +29081,6 @@ async function run() {
         });
         const webspaceName = `${webspacePrefix}-${ref}-${appKey}`.trim();
         const databasePrefix = `${webspacePrefix}-${ref}`.trim();
-        const webRoot = webspaceName.toLowerCase().replace(/[^a-z0-9-]/, '');
         const manifest = yaml.load(fs.readFileSync('./.hosting/config.yaml', 'utf8'));
         const app = manifest.applications[appKey] ?? null;
         if (null === app) {
@@ -29126,13 +29125,13 @@ async function run() {
             let vhost = foundVhosts.find(v => v.domainName === actualDomainName) ?? null;
             if (null === vhost) {
                 core.info(`Configuring ${actualDomainName}...`);
-                vhost = await createVhost(webspace, web, app, actualDomainName, webRoot);
+                vhost = await createVhost(webspace, web, app, actualDomainName);
             }
-            else if (mustBeUpdated(vhost, app, web, webRoot)) {
+            else if (mustBeUpdated(vhost, app, web)) {
                 core.info(`Configuring ${actualDomainName}...`);
                 // todo
             }
-            core.setOutput('deploy-path', `/home/${httpUser}/html/${webRoot}`);
+            core.setOutput('deploy-path', `/home/${httpUser}/html}`);
             core.setOutput('public-url', `https://${vhost.domainName}`);
         }
         for (const relict of foundVhosts.filter(v => !Object.entries(app.web)
@@ -29225,7 +29224,7 @@ function translateDomainName(domainName, environment, manifest, web, app) {
     }
     return domainName;
 }
-function mustBeUpdated(vhost, app, web, webRoot) {
+function mustBeUpdated(vhost, app, web) {
     if (app.php?.version && app.php.version !== vhost.phpVersion) {
         return true;
     }
@@ -29233,7 +29232,7 @@ function mustBeUpdated(vhost, app, web, webRoot) {
     if ((web.www ?? true) !== vhost.enableAlias) {
         return true;
     }
-    if (`${webRoot}/current/${web.root ?? ''}`.replace(/\/$/, '') !== vhost.webRoot) {
+    if (`current/${web.root ?? ''}`.replace(/\/$/, '') !== vhost.webRoot) {
         return true;
     }
     // todo locations
@@ -29487,7 +29486,7 @@ async function createDatabaseUser(dbUserName, manifest) {
 function transformPhpIni(ini) {
     return Object.entries(ini).map(([k, v]) => ({ key: k, value: `${v}` }));
 }
-async function createVhost(webspace, web, app, domainName, webRoot) {
+async function createVhost(webspace, web, app, domainName) {
     const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/vhostCreate', {
         authToken: token,
         vhost: {
@@ -29498,7 +29497,7 @@ async function createVhost(webspace, web, app, domainName, webRoot) {
             redirectToPrimaryName: true,
             redirectHttpToHttps: true,
             phpVersion: app.php?.version,
-            webRoot: `${webRoot}/current/${web.root ?? ''}`.replace(/\/$/, ''),
+            webRoot: `current/${web.root ?? ''}`.replace(/\/$/, ''),
             locations: Object.entries(web.locations ?? {}).map(function ([matchString, location]) {
                 return {
                     matchString,
