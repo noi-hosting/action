@@ -95,6 +95,7 @@ interface DatabaseAccess {
   lastChangeDate?: string
   accessLevel: string[]
   userId: string
+  dbLogin?: string
   userName?: string
   databaseId?: string
 }
@@ -682,9 +683,12 @@ async function createDatabase(
     throw new Error(JSON.stringify(response.result.errors ?? []))
   }
 
+  const database = response.result.response
+  const access = database.accesses.find(a => a.userId === user.id) ?? null
+
   return {
-    database: response.result.response,
-    databaseUserName: user.dbUserName,
+    database,
+    databaseUserName: access?.dbLogin ?? '',
     databasePassword: password
   }
 }
@@ -731,9 +735,12 @@ async function addDatabaseAccess(
     throw new Error(JSON.stringify(response.result.errors ?? []))
   }
 
+  const result = response.result.response
+  const access = result.accesses.find(a => a.userId === user.id) ?? null
+
   return {
-    database: response.result.response,
-    databaseUserName: user.dbUserName,
+    database: result,
+    databaseUserName: access?.dbLogin ?? '',
     databasePassword: password
   }
 }
