@@ -29065,6 +29065,7 @@ const crypto_1 = __importDefault(__nccwpck_require__(6113));
 const http_client_1 = __nccwpck_require__(6255);
 const fs = __importStar(__nccwpck_require__(7147));
 const yaml = __importStar(__nccwpck_require__(1917));
+const process = __importStar(__nccwpck_require__(7742));
 const _http = new http_client_1.HttpClient();
 const token = core.getInput('auth-token', { required: true });
 /**
@@ -29121,7 +29122,7 @@ async function run() {
         core.setOutput('http-user', httpUser);
         const foundVhosts = await findVhostByWebspace(webspace.id);
         for (const [domainName, web] of Object.entries(app.web)) {
-            const actualDomainName = translateDomainName(domainName, ref, manifest, web, appKey);
+            const actualDomainName = translateDomainName(domainName, ref, manifest, appKey);
             let vhost = foundVhosts.find(v => v.domainName === actualDomainName) ?? null;
             if (null === vhost) {
                 core.info(`Configuring ${actualDomainName}...`);
@@ -29134,8 +29135,8 @@ async function run() {
             core.setOutput('deploy-path', `/home/${httpUser}/html}`);
             core.setOutput('public-url', `https://${vhost.domainName}`);
         }
-        for (const relict of foundVhosts.filter(v => !Object.entries(app.web)
-            .map(([domainName, web]) => translateDomainName(domainName, ref, manifest, web, appKey))
+        for (const relict of foundVhosts.filter(v => !Object.keys(app.web)
+            .map(domainName => translateDomainName(domainName, ref, manifest, appKey))
             .includes(v.domainName))) {
             core.info(`Deleting ${relict.domainName}...`);
             await deleteVhostById(relict.id);
@@ -29209,23 +29210,29 @@ async function run() {
     }
 }
 exports.run = run;
-function translateDomainName(domainName, environment, manifest, web, app) {
-    if (environment === (manifest.project?.parent ?? '')) {
-        return domainName;
+function translateDomainName(domainName, environment, manifest, app) {
+    if ('_' === domainName) {
+        domainName = process.env.DOMAIN_NAME ?? '';
     }
-    if (null !== (web.environments ?? null) && environment in web.environments) {
-        return web.environments[environment];
+    if ('' === domainName) {
+        throw new Error(`No domain name configured for the app defined under "applications.${app}". ` +
+            `Please provide the variable "DOMAIN_NAME" under Github's environment settings. ` +
+            `Alternatively, set the domain name via "applications.${app}.web.locations[_]".`);
     }
-    if (null !== (manifest.project?.previewDomain ?? null)) {
-        // @ts-expect-error manifest.project can be null but actually not really
-        return manifest.project.previewDomain
-            .replace(/\{app}/gi, app)
-            .replace(/\{ref}/gi, environment);
+    const previewDomain = manifest.project?.previewDomain ?? null;
+    if (null !== previewDomain &&
+        environment !== (manifest.project?.parent ?? '')) {
+        domainName = previewDomain;
     }
-    return domainName;
+    // POC
+    // if (null !== (web.environments ?? null) && environment in web.environments) {
+    //   return web.environments[environment]
+    // }
+    return domainName.replace(/\{app}/gi, app).replace(/\{ref}/gi, environment);
 }
 function mustBeUpdated(vhost, app, web) {
-    if (app.php?.version && app.php.version !== vhost.phpVersion) {
+    const phpv = phpVersion(app);
+    if (phpv && phpv !== vhost.phpVersion) {
         return true;
     }
     // todo phpini
@@ -29486,6 +29493,9 @@ async function createDatabaseUser(dbUserName, manifest) {
 function transformPhpIni(ini) {
     return Object.entries(ini).map(([k, v]) => ({ key: k, value: `${v}` }));
 }
+function phpVersion(app) {
+    return app.php?.version ?? process.env.PHP_VERSION ?? null;
+}
 async function createVhost(webspace, web, app, domainName) {
     const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/vhostCreate', {
         authToken: token,
@@ -29496,7 +29506,7 @@ async function createVhost(webspace, web, app, domainName) {
             enableAlias: web.www ?? true,
             redirectToPrimaryName: true,
             redirectHttpToHttps: true,
-            phpVersion: app.php?.version,
+            phpVersion: phpVersion(app),
             webRoot: `current/${web.root ?? ''}`.replace(/\/$/, ''),
             locations: Object.entries(web.locations ?? {}).map(function ([matchString, location]) {
                 return {
@@ -29660,6 +29670,14 @@ module.exports = require("net");
 
 "use strict";
 module.exports = require("node:events");
+
+/***/ }),
+
+/***/ 7742:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("node:process");
 
 /***/ }),
 

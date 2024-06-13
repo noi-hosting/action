@@ -8,6 +8,7 @@ import { HttpClient } from '@actions/http-client'
 import * as fs from 'fs'
 import * as yaml from 'js-yaml'
 import { TypedResponse } from '@actions/http-client/lib/interfaces'
+import * as process from 'node:process'
 
 const _http = new HttpClient()
 const token = core.getInput('auth-token', { required: true })
@@ -48,9 +49,6 @@ interface ManifestAppWeb {
       expires?: boolean
       allow?: boolean
     }
-  }
-  environments: {
-    [environment: string]: string
   }
 }
 
@@ -252,7 +250,6 @@ export async function run(): Promise<void> {
         domainName,
         ref,
         manifest,
-        web,
         appKey
       )
 
@@ -272,9 +269,9 @@ export async function run(): Promise<void> {
 
     for (const relict of foundVhosts.filter(
       v =>
-        !Object.entries(app.web)
-          .map(([domainName, web]) =>
-            translateDomainName(domainName, ref, manifest, web, appKey)
+        !Object.keys(app.web)
+          .map(domainName =>
+            translateDomainName(domainName, ref, manifest, appKey)
           )
           .includes(v.domainName)
     )) {
@@ -384,25 +381,33 @@ function translateDomainName(
   domainName: string,
   environment: string,
   manifest: Manifest,
-  web: ManifestAppWeb,
   app: string
 ): string {
-  if (environment === (manifest.project?.parent ?? '')) {
-    return domainName
+  if ('_' === domainName) {
+    domainName = process.env.DOMAIN_NAME ?? ''
   }
 
-  if (null !== (web.environments ?? null) && environment in web.environments) {
-    return web.environments[environment]
+  if ('' === domainName) {
+    throw new Error(
+      `No domain name configured for the app defined under "applications.${app}". ` +
+        `Please provide the variable "DOMAIN_NAME" under Github's environment settings. ` +
+        `Alternatively, set the domain name via "applications.${app}.web.locations[_]".`
+    )
+  }
+  const previewDomain = manifest.project?.previewDomain ?? null
+  if (
+    null !== previewDomain &&
+    environment !== (manifest.project?.parent ?? '')
+  ) {
+    domainName = previewDomain
   }
 
-  if (null !== (manifest.project?.previewDomain ?? null)) {
-    // @ts-expect-error manifest.project can be null but actually not really
-    return manifest.project.previewDomain
-      .replace(/\{app}/gi, app)
-      .replace(/\{ref}/gi, environment)
-  }
+  // POC
+  // if (null !== (web.environments ?? null) && environment in web.environments) {
+  //   return web.environments[environment]
+  // }
 
-  return domainName
+  return domainName.replace(/\{app}/gi, app).replace(/\{ref}/gi, environment)
 }
 
 function mustBeUpdated(
@@ -410,7 +415,8 @@ function mustBeUpdated(
   app: ManifestApp,
   web: ManifestAppWeb
 ): boolean {
-  if (app.php?.version && app.php.version !== vhost.phpVersion) {
+  const phpv = phpVersion(app)
+  if (phpv && phpv !== vhost.phpVersion) {
     return true
   }
 
@@ -808,6 +814,10 @@ function transformPhpIni(ini: object): object {
   return Object.entries(ini).map(([k, v]) => ({ key: k, value: `${v}` }))
 }
 
+function phpVersion(app: ManifestApp): string | null {
+  return app.php?.version ?? process.env.PHP_VERSION ?? null
+}
+
 async function createVhost(
   webspace: WebspaceResult,
   web: ManifestAppWeb,
@@ -826,7 +836,7 @@ async function createVhost(
           enableAlias: web.www ?? true,
           redirectToPrimaryName: true,
           redirectHttpToHttps: true,
-          phpVersion: app.php?.version,
+          phpVersion: phpVersion(app),
           webRoot: `current/${web.root ?? ''}`.replace(/\/$/, ''),
           locations: Object.entries(web.locations ?? {}).map(function ([
             matchString,
