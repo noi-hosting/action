@@ -29214,15 +29214,15 @@ function translateDomainName(domainName, environment, manifest, app) {
     if ('_' === domainName) {
         domainName = process.env.DOMAIN_NAME ?? '';
     }
+    const previewDomain = manifest.project?.previewDomain ?? null;
+    if (null !== previewDomain &&
+        ('' === domainName || environment !== (manifest.project?.parent ?? ''))) {
+        domainName = previewDomain;
+    }
     if ('' === domainName) {
         throw new Error(`No domain name configured for the app defined under "applications.${app}". ` +
             `Please provide the variable "DOMAIN_NAME" under Github's environment settings. ` +
             `Alternatively, set the domain name via "applications.${app}.web.locations[_]".`);
-    }
-    const previewDomain = manifest.project?.previewDomain ?? null;
-    if (null !== previewDomain &&
-        environment !== (manifest.project?.parent ?? '')) {
-        domainName = previewDomain;
     }
     // POC
     // if (null !== (web.environments ?? null) && environment in web.environments) {
