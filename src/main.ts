@@ -263,7 +263,7 @@ export async function run(): Promise<void> {
         // todo
       }
 
-      core.setOutput('deploy-path', `/home/${httpUser}/html}`)
+      core.setOutput('deploy-path', `/home/${httpUser}/html`)
       core.setOutput('public-url', `https://${vhost.domainName}`)
     }
 

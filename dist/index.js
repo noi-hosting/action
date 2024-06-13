@@ -29132,7 +29132,7 @@ async function run() {
                 core.info(`Configuring ${actualDomainName}...`);
                 // todo
             }
-            core.setOutput('deploy-path', `/home/${httpUser}/html}`);
+            core.setOutput('deploy-path', `/home/${httpUser}/html`);
             core.setOutput('public-url', `https://${vhost.domainName}`);
         }
         for (const relict of foundVhosts.filter(v => !Object.keys(app.web)
