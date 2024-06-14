@@ -29077,11 +29077,11 @@ async function run() {
         // https://github.com/actions/toolkit/issues/1315
         const ref = process.env.GITHUB_REF_NAME ?? 'na';
         const appKey = core.getInput('app', { required: true });
-        const webspacePrefix = core.getInput('webspace-prefix', {
+        const projectPrefix = core.getInput('webspace-prefix', {
             required: true
         });
-        const webspaceName = `${webspacePrefix}-${ref}-${appKey}`.trim();
-        const databasePrefix = `${webspacePrefix}-${ref}`.trim();
+        const webspaceName = `${projectPrefix}-${ref}-${appKey}`.trim();
+        const databasePrefix = `${projectPrefix}-${ref}`.trim();
         const manifest = yaml.load(fs.readFileSync('./.hosting/config.yaml', 'utf8'));
         const app = manifest.applications[appKey] ?? null;
         if (null === app) {
@@ -29203,10 +29203,20 @@ async function run() {
             await deleteDatabaseById(relict.id);
         }
         core.setOutput('env-vars', envVars);
-        const branches = process.env.REPO_BRANCHES ?? null;
+        const branches = (process.env.REPO_BRANCHES ?? '').split(' ');
+        const allWebspaces = await findWebspaces(projectPrefix);
         if ((manifest.project?.prune ?? true) && branches) {
-            for (const branch of branches.split(' ')) {
-                core.info(branch);
+            for (const w of allWebspaces) {
+                const m = w.name.match(/\w+-(.+)-\w+/);
+                if (null === m) {
+                    continue;
+                }
+                if (!branches.includes(m[0])) {
+                    core.info(`Deleting webspace ${webspace.name}`);
+                }
+                else {
+                    core.info(`Keeping webspace ${webspace.name}`);
+                }
             }
         }
     }
@@ -29273,6 +29283,25 @@ async function findOneWebspaceByName(webspaceName) {
         throw new Error(`We found more than 1 webspace with name "${webspaceName}" and cannot know where to deploy to.`);
     }
     return response.result?.response?.data[0] ?? null;
+}
+async function findWebspaces(prefix) {
+    const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/webspacesFind', {
+        authToken: token,
+        filter: {
+            subFilterConnective: 'AND',
+            subFilter: [
+                {
+                    field: 'webspaceName',
+                    value: `${prefix}-*`
+                },
+                {
+                    field: 'webspaceStatus',
+                    value: 'active'
+                }
+            ]
+        }
+    });
+    return response.result?.response?.data ?? [];
 }
 async function findWebspaceById(webspaceId) {
     const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/webspacesFind', {

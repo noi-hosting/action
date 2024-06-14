@@ -186,11 +186,11 @@ export async function run(): Promise<void> {
     // https://github.com/actions/toolkit/issues/1315
     const ref = process.env.GITHUB_REF_NAME ?? 'na'
     const appKey: string = core.getInput('app', { required: true })
-    const webspacePrefix: string = core.getInput('webspace-prefix', {
+    const projectPrefix: string = core.getInput('webspace-prefix', {
       required: true
     })
-    const webspaceName: string = `${webspacePrefix}-${ref}-${appKey}`.trim()
-    const databasePrefix: string = `${webspacePrefix}-${ref}`.trim()
+    const webspaceName: string = `${projectPrefix}-${ref}-${appKey}`.trim()
+    const databasePrefix: string = `${projectPrefix}-${ref}`.trim()
     const manifest: Manifest = yaml.load(
       fs.readFileSync('./.hosting/config.yaml', 'utf8')
     ) as Manifest
@@ -374,10 +374,20 @@ export async function run(): Promise<void> {
 
     core.setOutput('env-vars', envVars)
 
-    const branches = process.env.REPO_BRANCHES ?? null
+    const branches = (process.env.REPO_BRANCHES ?? '').split(' ')
+    const allWebspaces = await findWebspaces(projectPrefix)
     if ((manifest.project?.prune ?? true) && branches) {
-      for (const branch of branches.split(' ')) {
-        core.info(branch)
+      for (const w of allWebspaces) {
+        const m = w.name.match(/\w+-(.+)-\w+/)
+        if (null === m) {
+          continue
+        }
+
+        if (!branches.includes(m[0])) {
+          core.info(`Deleting webspace ${webspace.name}`)
+        } else {
+          core.info(`Keeping webspace ${webspace.name}`)
+        }
       }
     }
   } catch (error) {
@@ -474,6 +484,30 @@ async function findOneWebspaceByName(
   }
 
   return response.result?.response?.data[0] ?? null
+}
+async function findWebspaces(prefix: string): Promise<WebspaceResult[]> {
+  const response: TypedResponse<ApiFindResponse<WebspaceResult>> =
+    await _http.postJson(
+      'https://secure.hosting.de/api/webhosting/v1/json/webspacesFind',
+      {
+        authToken: token,
+        filter: {
+          subFilterConnective: 'AND',
+          subFilter: [
+            {
+              field: 'webspaceName',
+              value: `${prefix}-*`
+            },
+            {
+              field: 'webspaceStatus',
+              value: 'active'
+            }
+          ]
+        }
+      }
+    )
+
+  return response.result?.response?.data ?? []
 }
 
 async function findWebspaceById(
