@@ -357,48 +357,64 @@ export async function run(): Promise<void> {
       }
     }
 
-    const allDatabaseNames = Object.values(manifest.applications).reduce(
-      (dbNames, a) => dbNames.concat(Object.values(a.databases ?? {})),
-      [] as string[]
-    )
-    for (const relict of foundDatabases.filter(
-      v =>
-        !allDatabaseNames
-          .map(n => `${databasePrefix}-${n.toLowerCase()}`)
-          .includes(v.name)
-    )) {
-      core.info(`Deleting database ${relict.name}`)
-
-      await deleteDatabaseById(relict.id)
-    }
+    await pruneEnvironmentDatabases(manifest, databasePrefix, foundDatabases)
 
     core.setOutput('env-vars', envVars)
 
-    const branches = (process.env.REPO_BRANCHES ?? '').split(' ')
-    const allWebspaces = await findWebspaces(projectPrefix)
-    if ((manifest.project?.prune ?? true) && branches) {
-      for (const w of allWebspaces) {
-        const m = w.name.match(/\w+-(.+)-\w+/)
-        if (null === m) {
-          continue
-        }
-
-        if (!branches.includes(m[1])) {
-          core.info(`Deleting webspace ${w.name}`)
-          await deleteWebspaceById(w.id)
-
-          const databases = await findDatabasesByWebspace(
-            `${projectPrefix}-${m[1]}`.trim()
-          )
-          for (const d of databases) {
-            core.info(`Deleting database ${d.name}`)
-            await deleteDatabaseById(d.id)
-          }
-        }
-      }
+    if (manifest.project?.prune ?? true) {
+      await pruneBranches(projectPrefix)
     }
   } catch (error) {
     if (error instanceof Error) core.setFailed(error.message)
+  }
+}
+
+async function pruneEnvironmentDatabases(
+  manifest: Manifest,
+  databasePrefix: string,
+  foundDatabases: DatabaseResult[]
+): Promise<void> {
+  const allDatabaseNames = Object.values(manifest.applications).reduce(
+    (dbNames, a) => dbNames.concat(Object.values(a.databases ?? {})),
+    [] as string[]
+  )
+  for (const relict of foundDatabases.filter(
+    v =>
+      !allDatabaseNames
+        .map(n => `${databasePrefix}-${n.toLowerCase()}`)
+        .includes(v.name)
+  )) {
+    core.info(`Deleting database ${relict.name}`)
+
+    await deleteDatabaseById(relict.id)
+  }
+}
+
+async function pruneBranches(projectPrefix: string): Promise<void> {
+  const branches = (process.env.REPO_BRANCHES ?? '').split(' ')
+  if (branches.length < 2) {
+    return
+  }
+
+  const allWebspaces = await findWebspaces(projectPrefix)
+  for (const webspace of allWebspaces) {
+    const match = webspace.name.match(/\w+-(.+)-\w+/)
+    if (null === match) {
+      continue
+    }
+
+    if (!branches.includes(match[1])) {
+      core.info(`Deleting webspace ${webspace.name}`)
+      await deleteWebspaceById(webspace.id)
+
+      const databases = await findDatabasesByWebspace(
+        `${projectPrefix}-${match[1]}`.trim()
+      )
+      for (const d of databases) {
+        core.info(`Deleting database ${d.name}`)
+        await deleteDatabaseById(d.id)
+      }
+    }
   }
 }
 
