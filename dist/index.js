@@ -29208,6 +29208,7 @@ async function run() {
         if ((manifest.project?.prune ?? true) && branches) {
             for (const w of allWebspaces) {
                 const m = w.name.match(/\w+-(.+)-\w+/);
+                core.info(JSON.stringify(m));
                 if (null === m) {
                     continue;
                 }
