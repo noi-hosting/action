@@ -29212,10 +29212,13 @@ async function run() {
                     continue;
                 }
                 if (!branches.includes(m[1])) {
-                    core.info(`Deleting webspace ${webspace.name}`);
-                }
-                else {
-                    core.info(`Keeping webspace ${webspace.name}`);
+                    core.info(`Deleting webspace ${w.name}`);
+                    await deleteWebspaceById(w.id);
+                    const databases = await findDatabasesByWebspace(`${projectPrefix}-${m[1]}`.trim());
+                    for (const d of databases) {
+                        core.info(`Deleting database ${d.name}`);
+                        await deleteDatabaseById(d.id);
+                    }
                 }
             }
         }
@@ -29313,6 +29316,12 @@ async function findWebspaceById(webspaceId) {
         }
     });
     return response.result?.response?.data[0] ?? null;
+}
+async function deleteWebspaceById(webspaceId) {
+    await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/webspaceDelete', {
+        authToken: token,
+        webspaceId
+    });
 }
 async function deleteVhostById(vhostId) {
     await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/vhostDelete', {
