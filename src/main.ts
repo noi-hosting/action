@@ -379,12 +379,11 @@ export async function run(): Promise<void> {
     if ((manifest.project?.prune ?? true) && branches) {
       for (const w of allWebspaces) {
         const m = w.name.match(/\w+-(.+)-\w+/)
-        core.info(JSON.stringify(m))
         if (null === m) {
           continue
         }
 
-        if (!branches.includes(m[0])) {
+        if (!branches.includes(m[1])) {
           core.info(`Deleting webspace ${webspace.name}`)
         } else {
           core.info(`Keeping webspace ${webspace.name}`)
