@@ -16,7 +16,8 @@ const token = core.getInput('auth-token', { required: true })
 interface Manifest {
   project?: {
     parent?: string
-    previewDomain?: string
+    domain?: string
+    prune?: boolean
   }
   applications: {
     [app: string]: ManifestApp
@@ -372,6 +373,13 @@ export async function run(): Promise<void> {
     }
 
     core.setOutput('env-vars', envVars)
+
+    const branches = process.env.REPO_BRANCHES ?? null
+    if ((manifest.project?.prune ?? true) && branches) {
+      for (const branch of branches.split(' ')) {
+        core.info(branch)
+      }
+    }
   } catch (error) {
     if (error instanceof Error) core.setFailed(error.message)
   }
@@ -387,7 +395,7 @@ function translateDomainName(
     domainName = process.env.DOMAIN_NAME ?? ''
   }
 
-  const previewDomain = manifest.project?.previewDomain ?? null
+  const previewDomain = manifest.project?.domain ?? null
   if (
     null !== previewDomain &&
     ('' === domainName || environment !== (manifest.project?.parent ?? ''))

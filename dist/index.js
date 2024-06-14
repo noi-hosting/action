@@ -29203,6 +29203,12 @@ async function run() {
             await deleteDatabaseById(relict.id);
         }
         core.setOutput('env-vars', envVars);
+        const branches = process.env.REPO_BRANCHES ?? null;
+        if ((manifest.project?.prune ?? true) && branches) {
+            for (const branch of branches.split(' ')) {
+                core.info(branch);
+            }
+        }
     }
     catch (error) {
         if (error instanceof Error)
@@ -29214,7 +29220,7 @@ function translateDomainName(domainName, environment, manifest, app) {
     if ('_' === domainName) {
         domainName = process.env.DOMAIN_NAME ?? '';
     }
-    const previewDomain = manifest.project?.previewDomain ?? null;
+    const previewDomain = manifest.project?.domain ?? null;
     if (null !== previewDomain &&
         ('' === domainName || environment !== (manifest.project?.parent ?? ''))) {
         domainName = previewDomain;
