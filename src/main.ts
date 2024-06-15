@@ -191,146 +191,193 @@ export async function run(): Promise<void> {
     })
     const webspaceName: string = `${projectPrefix}-${ref}-${appKey}`.trim()
     const databasePrefix: string = `${projectPrefix}-${ref}`.trim()
-    const manifest: Manifest = yaml.load(
-      fs.readFileSync('./.hosting/config.yaml', 'utf8')
-    ) as Manifest
-    const app = manifest.applications[appKey] ?? null
-    if (null === app) {
-      throw new Error(
-        `Cannot find "applications.${appKey}" in the ".hosting/config.yaml" manifest.`
-      )
-    }
-    let webspace: WebspaceResult
-    let foundWebspace: WebspaceResult | null =
-      await findOneWebspaceByName(webspaceName)
-    if (null !== foundWebspace) {
-      webspace = foundWebspace
-      core.info(`Using webspace ${webspaceName} (${webspace.id})`)
-      core.setOutput('shall-sync', false)
-    } else {
-      core.info('Creating a new webspace...')
-      core.setOutput('shall-sync', true)
-      webspace = await createWebspace(app, webspaceName)
+    const { manifest, app } = await loadConfig(appKey)
 
-      do {
-        await wait(2000)
-        core.info(
-          `Waiting for webspace ${webspaceName} (${webspace.id}) to boot...`
-        )
-        foundWebspace = await findWebspaceById(webspace.id)
-        if (null === foundWebspace) {
-          break
-        }
-        webspace = foundWebspace
-      } while ('active' !== webspace.status)
-    }
+    const webspace = await getWebspace(webspaceName, app)
+    const webspaceAccess = await getWebspaceAccess(webspace)
 
-    const availableUsers = await findWebspaceUsers()
-    const webspaceAccess: WebspaceAccess | null =
-      webspace.accesses.find(a =>
-        availableUsers.find(u => u.id === a.userId)
-      ) ?? null
-    if (null === webspaceAccess) {
-      throw new Error(
-        `It seems that the SSH access to the webspace was revoked for the github-action.`
-      )
-    }
-
+    const envVars = {}
     const sshUser = webspaceAccess.userName
     const sshHost = webspace.hostName
     const httpUser = webspace.webspaceName
+
+    const foundVhosts: VhostResult[] = await findVhostByWebspace(webspace.id)
+    await configureVhosts(
+      app,
+      ref,
+      manifest,
+      appKey,
+      foundVhosts,
+      webspace,
+      httpUser
+    )
+    await pruneVhosts(foundVhosts, app, ref, manifest, appKey)
+
+    const foundDatabases = await findDatabasesByWebspace(databasePrefix)
+    await configureDatabases(
+      app,
+      databasePrefix,
+      appKey,
+      foundDatabases,
+      envVars
+    )
+    await pruneDatabases(manifest, databasePrefix, foundDatabases)
 
     core.setOutput('ssh-user', sshUser)
     core.setOutput('ssh-host', sshHost)
     core.setOutput('ssh-port', 2244)
     core.setOutput('http-user', httpUser)
+    core.setOutput('env-vars', envVars)
 
-    const foundVhosts: VhostResult[] = await findVhostByWebspace(webspace.id)
-    for (const [domainName, web] of Object.entries(app.web)) {
-      const actualDomainName = translateDomainName(
-        domainName,
-        ref,
-        manifest,
-        appKey
-      )
+    if (manifest.project?.prune ?? true) {
+      await pruneBranches(projectPrefix)
+    }
+  } catch (error) {
+    if (error instanceof Error) core.setFailed(error.message)
+  }
+}
 
-      let vhost =
-        foundVhosts.find(v => v.domainName === actualDomainName) ?? null
-      if (null === vhost) {
-        core.info(`Configuring ${actualDomainName}...`)
-        vhost = await createVhost(webspace, web, app, actualDomainName)
-      } else if (mustBeUpdated(vhost, app, web)) {
-        core.info(`Configuring ${actualDomainName}...`)
-        // todo
-      }
+async function loadConfig(
+  appKey: string
+): Promise<{ manifest: Manifest; app: ManifestApp }> {
+  const manifest = yaml.load(
+    fs.readFileSync('./.hosting/config.yaml', 'utf8')
+  ) as Manifest
+  const app = manifest.applications[appKey] ?? null
+  if (null === app) {
+    throw new Error(
+      `Cannot find "applications.${appKey}" in the ".hosting/config.yaml" manifest.`
+    )
+  }
 
-      core.setOutput('deploy-path', `/home/${httpUser}/html`)
-      core.setOutput('public-url', `https://${vhost.domainName}`)
+  return { manifest, app }
+}
+
+async function getWebspace(
+  webspaceName: string,
+  app: ManifestApp
+): Promise<WebspaceResult> {
+  let webspace: WebspaceResult | null =
+    await findOneWebspaceByName(webspaceName)
+  if (null !== webspace) {
+    core.info(`Using webspace ${webspaceName} (${webspace.id})`)
+    core.setOutput('shall-sync', false)
+
+    return webspace
+  }
+
+  core.info('Creating a new webspace...')
+  core.setOutput('shall-sync', true)
+  webspace = await createWebspace(app, webspaceName)
+
+  do {
+    await wait(2000)
+    core.info(
+      `Waiting for webspace ${webspaceName} (${webspace.id}) to boot...`
+    )
+    webspace = await findWebspaceById(webspace.id)
+    if (null === webspace) {
+      throw new Error(`Unexpected error.`)
+    }
+  } while ('active' !== webspace.status)
+
+  return webspace
+}
+
+async function getWebspaceAccess(
+  webspace: WebspaceResult
+): Promise<WebspaceAccess> {
+  const availableUsers = await findWebspaceUsers()
+  const webspaceAccess =
+    webspace.accesses.find(a => availableUsers.find(u => u.id === a.userId)) ??
+    null
+
+  if (null === webspaceAccess) {
+    throw new Error(
+      `It seems that the SSH access to the webspace was revoked for the github-action.`
+    )
+  }
+
+  return webspaceAccess
+}
+
+async function configureVhosts(
+  app: ManifestApp,
+  ref: string,
+  manifest: Manifest,
+  appKey: string,
+  foundVhosts: VhostResult[],
+  webspace: WebspaceResult,
+  httpUser: string
+): Promise<void> {
+  for (const [domainName, web] of Object.entries(app.web)) {
+    const actualDomainName = translateDomainName(
+      domainName,
+      ref,
+      manifest,
+      appKey
+    )
+
+    let vhost = foundVhosts.find(v => v.domainName === actualDomainName) ?? null
+    if (null === vhost) {
+      core.info(`Configuring ${actualDomainName}...`)
+      vhost = await createVhost(webspace, web, app, actualDomainName)
+    } else if (mustBeUpdated(vhost, app, web)) {
+      core.info(`Configuring ${actualDomainName}...`)
+      // todo
     }
 
-    for (const relict of foundVhosts.filter(
-      v =>
-        !Object.keys(app.web)
-          .map(domainName =>
-            translateDomainName(domainName, ref, manifest, appKey)
-          )
-          .includes(v.domainName)
-    )) {
-      core.info(`Deleting ${relict.domainName}...`)
+    core.setOutput('deploy-path', `/home/${httpUser}/html`)
+    core.setOutput('public-url', `https://${vhost.domainName}`)
+  }
+}
 
-      await deleteVhostById(relict.id)
-    }
-
-    const envVars = {}
-
-    const foundDatabases = await findDatabasesByWebspace(databasePrefix)
-    for (const [relationName, databaseName] of Object.entries(
-      app.databases ?? {}
-    )) {
-      const databaseInternalName = `${databasePrefix}-${databaseName.toLowerCase()}`
-      const dbUserName = `${databasePrefix}-${appKey}--${relationName.toLowerCase()}`
-
-      const existingDatabase =
-        foundDatabases.find(d => d.name === databaseInternalName) ?? null
-      if (null !== existingDatabase) {
-        const usersWithAccess = await findDatabaseAccesses(
-          dbUserName,
-          existingDatabase.id
+async function pruneVhosts(
+  foundVhosts: VhostResult[],
+  app: ManifestApp,
+  ref: string,
+  manifest: Manifest,
+  appKey: string
+): Promise<void> {
+  for (const relict of foundVhosts.filter(
+    v =>
+      !Object.keys(app.web)
+        .map(domainName =>
+          translateDomainName(domainName, ref, manifest, appKey)
         )
-        if (!usersWithAccess.length) {
-          core.info(`Granting access on database ${databaseInternalName}`)
+        .includes(v.domainName)
+  )) {
+    core.info(`Deleting ${relict.domainName}...`)
 
-          const { database, databaseUserName, databasePassword } =
-            await addDatabaseAccess(existingDatabase, dbUserName, app)
+    await deleteVhostById(relict.id)
+  }
+}
 
-          Object.assign(
-            envVars,
-            Object.fromEntries([
-              [
-                `${relationName.toUpperCase()}_SERVER`,
-                `mysql://${database.hostName}`
-              ],
-              [`${relationName.toUpperCase()}_DRIVER`, 'mysql'],
-              [`${relationName.toUpperCase()}_HOST`, database.hostName],
-              [`${relationName.toUpperCase()}_PORT`, 3306],
-              [`${relationName.toUpperCase()}_NAME`, database.dbName],
-              [`${relationName.toUpperCase()}_USERNAME`, databaseUserName],
-              [`${relationName.toUpperCase()}_PASSWORD`, databasePassword],
-              [
-                `${relationName.toUpperCase()}_URL`,
-                `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
-              ]
-            ])
-          )
+async function configureDatabases(
+  app: ManifestApp,
+  databasePrefix: string,
+  appKey: string,
+  foundDatabases: DatabaseResult[],
+  envVars: object
+): Promise<void> {
+  for (const [relationName, databaseName] of Object.entries(
+    app.databases ?? {}
+  )) {
+    const databaseInternalName = `${databasePrefix}-${databaseName.toLowerCase()}`
+    const dbUserName = `${databasePrefix}-${appKey}--${relationName.toLowerCase()}`
 
-          core.setSecret(databaseUserName)
-          core.setSecret(databasePassword)
-        }
-      } else {
-        core.info(`Creating database ${databaseInternalName}`)
+    const existingDatabase =
+      foundDatabases.find(d => d.name === databaseInternalName) ?? null
+    if (null !== existingDatabase) {
+      const usersWithAccess = await findDatabaseAccesses(
+        dbUserName,
+        existingDatabase.id
+      )
+      if (!usersWithAccess.length) {
+        core.info(`Granting access on database ${databaseInternalName}`)
 
         const { database, databaseUserName, databasePassword } =
-          await createDatabase(app, dbUserName, databaseInternalName)
+          await addDatabaseAccess(existingDatabase, dbUserName, app)
 
         Object.assign(
           envVars,
@@ -355,21 +402,39 @@ export async function run(): Promise<void> {
         core.setSecret(databaseUserName)
         core.setSecret(databasePassword)
       }
+    } else {
+      core.info(`Creating database ${databaseInternalName}`)
+
+      const { database, databaseUserName, databasePassword } =
+        await createDatabase(app, dbUserName, databaseInternalName)
+
+      Object.assign(
+        envVars,
+        Object.fromEntries([
+          [
+            `${relationName.toUpperCase()}_SERVER`,
+            `mysql://${database.hostName}`
+          ],
+          [`${relationName.toUpperCase()}_DRIVER`, 'mysql'],
+          [`${relationName.toUpperCase()}_HOST`, database.hostName],
+          [`${relationName.toUpperCase()}_PORT`, 3306],
+          [`${relationName.toUpperCase()}_NAME`, database.dbName],
+          [`${relationName.toUpperCase()}_USERNAME`, databaseUserName],
+          [`${relationName.toUpperCase()}_PASSWORD`, databasePassword],
+          [
+            `${relationName.toUpperCase()}_URL`,
+            `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
+          ]
+        ])
+      )
+
+      core.setSecret(databaseUserName)
+      core.setSecret(databasePassword)
     }
-
-    await pruneEnvironmentDatabases(manifest, databasePrefix, foundDatabases)
-
-    core.setOutput('env-vars', envVars)
-
-    if (manifest.project?.prune ?? true) {
-      await pruneBranches(projectPrefix)
-    }
-  } catch (error) {
-    if (error instanceof Error) core.setFailed(error.message)
   }
 }
 
-async function pruneEnvironmentDatabases(
+async function pruneDatabases(
   manifest: Manifest,
   databasePrefix: string,
   foundDatabases: DatabaseResult[]
