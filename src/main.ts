@@ -379,28 +379,13 @@ async function configureDatabases(
         const { database, databaseUserName, databasePassword } =
           await addDatabaseAccess(existingDatabase, dbUserName, app)
 
-        Object.assign(
+        defineEnv(
           envVars,
-          Object.fromEntries([
-            [
-              `${relationName.toUpperCase()}_SERVER`,
-              `mysql://${database.hostName}`
-            ],
-            [`${relationName.toUpperCase()}_DRIVER`, 'mysql'],
-            [`${relationName.toUpperCase()}_HOST`, database.hostName],
-            [`${relationName.toUpperCase()}_PORT`, 3306],
-            [`${relationName.toUpperCase()}_NAME`, database.dbName],
-            [`${relationName.toUpperCase()}_USERNAME`, databaseUserName],
-            [`${relationName.toUpperCase()}_PASSWORD`, databasePassword],
-            [
-              `${relationName.toUpperCase()}_URL`,
-              `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
-            ]
-          ])
+          relationName,
+          database,
+          databaseUserName,
+          databasePassword
         )
-
-        core.setSecret(databaseUserName)
-        core.setSecret(databasePassword)
       }
     } else {
       core.info(`Creating database ${databaseInternalName}`)
@@ -408,30 +393,43 @@ async function configureDatabases(
       const { database, databaseUserName, databasePassword } =
         await createDatabase(app, dbUserName, databaseInternalName)
 
-      Object.assign(
+      defineEnv(
         envVars,
-        Object.fromEntries([
-          [
-            `${relationName.toUpperCase()}_SERVER`,
-            `mysql://${database.hostName}`
-          ],
-          [`${relationName.toUpperCase()}_DRIVER`, 'mysql'],
-          [`${relationName.toUpperCase()}_HOST`, database.hostName],
-          [`${relationName.toUpperCase()}_PORT`, 3306],
-          [`${relationName.toUpperCase()}_NAME`, database.dbName],
-          [`${relationName.toUpperCase()}_USERNAME`, databaseUserName],
-          [`${relationName.toUpperCase()}_PASSWORD`, databasePassword],
-          [
-            `${relationName.toUpperCase()}_URL`,
-            `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
-          ]
-        ])
+        relationName,
+        database,
+        databaseUserName,
+        databasePassword
       )
-
-      core.setSecret(databaseUserName)
-      core.setSecret(databasePassword)
     }
   }
+}
+
+function defineEnv(
+  envVars: object,
+  relationName: string,
+  database: DatabaseResult,
+  databaseUserName: string,
+  databasePassword: string
+): void {
+  Object.assign(
+    envVars,
+    Object.fromEntries([
+      [`${relationName.toUpperCase()}_SERVER`, `mysql://${database.hostName}`],
+      [`${relationName.toUpperCase()}_DRIVER`, 'mysql'],
+      [`${relationName.toUpperCase()}_HOST`, database.hostName],
+      [`${relationName.toUpperCase()}_PORT`, 3306],
+      [`${relationName.toUpperCase()}_NAME`, database.dbName],
+      [`${relationName.toUpperCase()}_USERNAME`, databaseUserName],
+      [`${relationName.toUpperCase()}_PASSWORD`, databasePassword],
+      [
+        `${relationName.toUpperCase()}_URL`,
+        `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
+      ]
+    ])
+  )
+
+  core.setSecret(databaseUserName)
+  core.setSecret(databasePassword)
 }
 
 async function pruneDatabases(

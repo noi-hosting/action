@@ -29181,49 +29181,32 @@ async function configureDatabases(app, databasePrefix, appKey, foundDatabases, e
             if (!usersWithAccess.length) {
                 core.info(`Granting access on database ${databaseInternalName}`);
                 const { database, databaseUserName, databasePassword } = await addDatabaseAccess(existingDatabase, dbUserName, app);
-                Object.assign(envVars, Object.fromEntries([
-                    [
-                        `${relationName.toUpperCase()}_SERVER`,
-                        `mysql://${database.hostName}`
-                    ],
-                    [`${relationName.toUpperCase()}_DRIVER`, 'mysql'],
-                    [`${relationName.toUpperCase()}_HOST`, database.hostName],
-                    [`${relationName.toUpperCase()}_PORT`, 3306],
-                    [`${relationName.toUpperCase()}_NAME`, database.dbName],
-                    [`${relationName.toUpperCase()}_USERNAME`, databaseUserName],
-                    [`${relationName.toUpperCase()}_PASSWORD`, databasePassword],
-                    [
-                        `${relationName.toUpperCase()}_URL`,
-                        `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
-                    ]
-                ]));
-                core.setSecret(databaseUserName);
-                core.setSecret(databasePassword);
+                defineEnv(envVars, relationName, database, databaseUserName, databasePassword);
             }
         }
         else {
             core.info(`Creating database ${databaseInternalName}`);
             const { database, databaseUserName, databasePassword } = await createDatabase(app, dbUserName, databaseInternalName);
-            Object.assign(envVars, Object.fromEntries([
-                [
-                    `${relationName.toUpperCase()}_SERVER`,
-                    `mysql://${database.hostName}`
-                ],
-                [`${relationName.toUpperCase()}_DRIVER`, 'mysql'],
-                [`${relationName.toUpperCase()}_HOST`, database.hostName],
-                [`${relationName.toUpperCase()}_PORT`, 3306],
-                [`${relationName.toUpperCase()}_NAME`, database.dbName],
-                [`${relationName.toUpperCase()}_USERNAME`, databaseUserName],
-                [`${relationName.toUpperCase()}_PASSWORD`, databasePassword],
-                [
-                    `${relationName.toUpperCase()}_URL`,
-                    `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
-                ]
-            ]));
-            core.setSecret(databaseUserName);
-            core.setSecret(databasePassword);
+            defineEnv(envVars, relationName, database, databaseUserName, databasePassword);
         }
     }
+}
+function defineEnv(envVars, relationName, database, databaseUserName, databasePassword) {
+    Object.assign(envVars, Object.fromEntries([
+        [`${relationName.toUpperCase()}_SERVER`, `mysql://${database.hostName}`],
+        [`${relationName.toUpperCase()}_DRIVER`, 'mysql'],
+        [`${relationName.toUpperCase()}_HOST`, database.hostName],
+        [`${relationName.toUpperCase()}_PORT`, 3306],
+        [`${relationName.toUpperCase()}_NAME`, database.dbName],
+        [`${relationName.toUpperCase()}_USERNAME`, databaseUserName],
+        [`${relationName.toUpperCase()}_PASSWORD`, databasePassword],
+        [
+            `${relationName.toUpperCase()}_URL`,
+            `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
+        ]
+    ]));
+    core.setSecret(databaseUserName);
+    core.setSecret(databasePassword);
 }
 async function pruneDatabases(manifest, databasePrefix, foundDatabases) {
     const allDatabaseNames = Object.values(manifest.applications).reduce((dbNames, a) => dbNames.concat(Object.values(a.databases ?? {})), []);
