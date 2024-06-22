@@ -20,7 +20,7 @@ export async function run(): Promise<void> {
     const webspaceName: string = `${projectPrefix}-${ref}-${appKey}`.trim()
     const databasePrefix: string = `${projectPrefix}-${ref}`.trim()
     const { manifest, app, envVars } = await config(appKey)
-
+    console.info(JSON.stringify(envVars))
     const { webspace, sshHost, sshUser, httpUser } = await services.getWebspace(
       webspaceName,
       app

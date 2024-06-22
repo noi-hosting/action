@@ -29304,23 +29304,6 @@ async function createDatabase(dbUserName, databaseName, poolId = null, accountId
             }
         ]
     });
-    console.info(JSON.stringify({
-        authToken: token,
-        poolId,
-        database: {
-            name: databaseName,
-            comments: 'Created by github action. Please do not change name.',
-            productCode: 'database-mariadb-single-v1-1m',
-            storageQuota: 512,
-            accountId
-        },
-        accesses: [
-            {
-                userId: user.id,
-                accessLevel: ['read', 'write', 'schema']
-            }
-        ]
-    }));
     if (null === response.result) {
         throw new Error('Unexpected error');
     }
@@ -29517,6 +29500,7 @@ async function run() {
         const webspaceName = `${projectPrefix}-${ref}-${appKey}`.trim();
         const databasePrefix = `${projectPrefix}-${ref}`.trim();
         const { manifest, app, envVars } = await (0, config_1.config)(appKey);
+        console.info(JSON.stringify(envVars));
         const { webspace, sshHost, sshUser, httpUser } = await services.getWebspace(webspaceName, app);
         const { destinations } = await services.applyVhosts(webspace, app, manifest, ref, appKey, httpUser);
         const { envVars: dbEnvVars } = await services.applyDatabases(databasePrefix, appKey, app, manifest);
