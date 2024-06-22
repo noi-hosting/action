@@ -197,6 +197,10 @@ export async function configureDatabases(
     const databaseInternalName = `${databasePrefix}-${databaseName.toLowerCase()}`
     const dbUserName = `${databasePrefix}-${appKey}--${relationName.toLowerCase()}`
 
+    core.info(
+      `Processing database "${databaseName}" for relation "${relationName}"`
+    )
+
     const existingDatabase =
       foundDatabases.find(d => d.name === databaseInternalName) ?? null
     if (null !== existingDatabase) {
@@ -204,7 +208,9 @@ export async function configureDatabases(
         dbUserName,
         existingDatabase.id
       )
-      if (!usersWithAccess.length) {
+      if (usersWithAccess.length) {
+        core.info(`Database already in use (${databaseInternalName})`)
+      } else {
         core.info(`Granting access on database ${databaseInternalName}`)
 
         const { database, databaseUserName, databasePassword } =

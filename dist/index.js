@@ -29651,10 +29651,14 @@ async function configureDatabases(app, databasePrefix, appKey, foundDatabases, e
     for (const [relationName, databaseName] of Object.entries(app.databases ?? {})) {
         const databaseInternalName = `${databasePrefix}-${databaseName.toLowerCase()}`;
         const dbUserName = `${databasePrefix}-${appKey}--${relationName.toLowerCase()}`;
+        core.info(`Processing database "${databaseName}" for relation "${relationName}"`);
         const existingDatabase = foundDatabases.find(d => d.name === databaseInternalName) ?? null;
         if (null !== existingDatabase) {
             const usersWithAccess = await client.findDatabaseAccesses(dbUserName, existingDatabase.id);
-            if (!usersWithAccess.length) {
+            if (usersWithAccess.length) {
+                core.info(`Database already in use (${databaseInternalName})`);
+            }
+            else {
                 core.info(`Granting access on database ${databaseInternalName}`);
                 const { database, databaseUserName, databasePassword } = await client.addDatabaseAccess(existingDatabase, dbUserName, app.account ?? null);
                 defineEnv(envVars, relationName, database, databaseUserName, databasePassword);
