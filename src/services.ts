@@ -72,7 +72,7 @@ export async function applyDatabases(
   appKey: string,
   app: ManifestApp,
   manifest: Manifest
-): Promise<{ envVars: object }> {
+): Promise<{ envVars: { [key: string]: string | boolean | number } }> {
   const envVars = {}
   const foundDatabases = await client.findDatabasesByPrefix(databasePrefix)
 

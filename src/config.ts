@@ -1,9 +1,11 @@
 import * as yaml from 'js-yaml'
 import fs from 'fs'
 
-export async function config(
-  appKey: string
-): Promise<{ manifest: Manifest; app: ManifestApp }> {
+export async function config(appKey: string): Promise<{
+  manifest: Manifest
+  app: ManifestApp
+  envVars: { [key: string]: string | boolean | number }
+}> {
   const manifest = yaml.load(
     fs.readFileSync('./.hosting/config.yaml', 'utf8')
   ) as Manifest
@@ -14,7 +16,9 @@ export async function config(
     )
   }
 
-  return { manifest, app }
+  const envVars = app.env ?? {}
+
+  return { manifest, app, envVars }
 }
 
 interface Manifest {
@@ -36,6 +40,9 @@ interface ManifestApp {
     ini?: {
       [key: string]: string | boolean
     }
+  }
+  env?: {
+    [key: string]: string | boolean | number
   }
   databases?: {
     [key: string]: string

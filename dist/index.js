@@ -29442,7 +29442,8 @@ async function config(appKey) {
     if (null === app) {
         throw new Error(`Cannot find "applications.${appKey}" in the ".hosting/config.yaml" manifest.`);
     }
-    return { manifest, app };
+    const envVars = app.env ?? {};
+    return { manifest, app, envVars };
 }
 exports.config = config;
 
@@ -29498,15 +29499,15 @@ async function run() {
         });
         const webspaceName = `${projectPrefix}-${ref}-${appKey}`.trim();
         const databasePrefix = `${projectPrefix}-${ref}`.trim();
-        const { manifest, app } = await (0, config_1.config)(appKey);
+        const { manifest, app, envVars } = await (0, config_1.config)(appKey);
         const { webspace, sshHost, sshUser, httpUser } = await services.getWebspace(webspaceName, app);
         const { destinations } = await services.applyVhosts(webspace, app, manifest, ref, appKey, httpUser);
-        const { envVars } = await services.applyDatabases(databasePrefix, appKey, app, manifest);
+        const { envVars: dbEnvVars } = await services.applyDatabases(databasePrefix, appKey, app, manifest);
         core.setOutput('ssh-user', sshUser);
         core.setOutput('ssh-host', sshHost);
         core.setOutput('ssh-port', 2244);
         core.setOutput('http-user', httpUser);
-        core.setOutput('env-vars', envVars);
+        core.setOutput('env-vars', Object.assign(envVars, dbEnvVars));
         core.setOutput('deploy-path', destinations[0].deployPath);
         core.setOutput('public-url', destinations[0].publicUrl);
         if (manifest.project?.prune ?? true) {
