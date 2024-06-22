@@ -29304,6 +29304,23 @@ async function createDatabase(dbUserName, databaseName, poolId = null, accountId
             }
         ]
     });
+    console.info(JSON.stringify({
+        authToken: token,
+        poolId,
+        database: {
+            name: databaseName,
+            comments: 'Created by github action. Please do not change name.',
+            productCode: 'database-mariadb-single-v1-1m',
+            storageQuota: 512,
+            accountId
+        },
+        accesses: [
+            {
+                userId: user.id,
+                accessLevel: ['read', 'write', 'schema']
+            }
+        ]
+    }));
     if (null === response.result) {
         throw new Error('Unexpected error');
     }
