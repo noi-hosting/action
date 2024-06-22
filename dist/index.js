@@ -29635,7 +29635,7 @@ async function configureVhosts(domainName, web, app, ref, manifest, appKey, foun
         core.info(`Configuring ${actualDomainName}...`);
         // todo
     }
-    return { domainName };
+    return { domainName: actualDomainName };
 }
 exports.configureVhosts = configureVhosts;
 async function pruneVhosts(foundVhosts, app, ref, manifest, appKey) {

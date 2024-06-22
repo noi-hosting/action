@@ -4,15 +4,17 @@ author: Richard Henkenjohann
 
 inputs:
   auth-token:
-    description: The auth token from your Hosting.de account.
+    description: The API authentication token, from the Hosting.de admin panel.
     required: true
   app:
-    description: The key of the current application in the yaml manifest.
+    description:
+      You can only deploy one app on a time, provide the key of the current
+      application in the yaml manifest.
     default: app
   project-prefix:
     description:
-      A unique name for webspaces that are related to the build. Example
-      `my-app`. Must be unique under all projects exist under the same account.
+      A prefix used to identify resources on Hosting.de. Must be kept unique
+      under all projects under the account. Keep it short, e.g. `project1`
     required: true
   ssh-public-key:
     description:

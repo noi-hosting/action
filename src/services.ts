@@ -160,7 +160,7 @@ export async function configureVhosts(
     // todo
   }
 
-  return { domainName }
+  return { domainName: actualDomainName }
 }
 
 export async function pruneVhosts(
