@@ -9,10 +9,10 @@ inputs:
   app:
     description: The key of the current application in the yaml manifest.
     default: app
-  webspace-prefix:
+  project-prefix:
     description:
       A unique name for webspaces that are related to the build. Example
-      `my-app`.
+      `my-app`. Must be unique under all projects exist under the same account.
     required: true
   ssh-public-key:
     description:

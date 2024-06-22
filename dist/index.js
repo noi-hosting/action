@@ -29024,12 +29024,11 @@ exports["default"] = _default;
 
 /***/ }),
 
-/***/ 399:
+/***/ 5707:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
-// noinspection ExceptionCaughtLocallyJS
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -29057,225 +29056,36 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.run = void 0;
+exports.createDatabaseUser = exports.createWebspaceUser = exports.addDatabaseAccess = exports.createDatabase = exports.createVhost = exports.createWebspace = exports.findWebspaceUsers = exports.findDatabaseAccesses = exports.findDatabasesByPrefix = exports.deleteDatabaseById = exports.deleteVhostById = exports.deleteWebspaceById = exports.findVhostByWebspace = exports.findWebspaceById = exports.findOneWebspaceByName = exports.findActiveWebspaces = void 0;
 const core = __importStar(__nccwpck_require__(2186));
-// import * as github from '@actions/github'
-const wait_1 = __nccwpck_require__(5259);
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
 const http_client_1 = __nccwpck_require__(6255);
-const fs = __importStar(__nccwpck_require__(7147));
-const yaml = __importStar(__nccwpck_require__(1917));
-const process = __importStar(__nccwpck_require__(7742));
+const node_process_1 = __importDefault(__nccwpck_require__(7742));
 const _http = new http_client_1.HttpClient();
 const token = core.getInput('auth-token', { required: true });
-/**
- * The main function for the action.
- * @returns {Promise<void>} Resolves when the action is complete.
- */
-async function run() {
-    try {
-        // https://github.com/actions/toolkit/issues/1315
-        const ref = process.env.GITHUB_REF_NAME ?? 'na';
-        const appKey = core.getInput('app', { required: true });
-        const projectPrefix = core.getInput('webspace-prefix', {
-            required: true
-        });
-        const webspaceName = `${projectPrefix}-${ref}-${appKey}`.trim();
-        const databasePrefix = `${projectPrefix}-${ref}`.trim();
-        const { manifest, app } = await loadConfig(appKey);
-        const webspace = await getWebspace(webspaceName, app);
-        const webspaceAccess = await getWebspaceAccess(webspace);
-        const envVars = {};
-        const sshUser = webspaceAccess.userName;
-        const sshHost = webspace.hostName;
-        const httpUser = webspace.webspaceName;
-        const foundVhosts = await findVhostByWebspace(webspace.id);
-        await configureVhosts(app, ref, manifest, appKey, foundVhosts, webspace, httpUser);
-        await pruneVhosts(foundVhosts, app, ref, manifest, appKey);
-        const foundDatabases = await findDatabasesByWebspace(databasePrefix);
-        await configureDatabases(app, databasePrefix, appKey, foundDatabases, envVars);
-        await pruneDatabases(manifest, databasePrefix, foundDatabases);
-        core.setOutput('ssh-user', sshUser);
-        core.setOutput('ssh-host', sshHost);
-        core.setOutput('ssh-port', 2244);
-        core.setOutput('http-user', httpUser);
-        core.setOutput('env-vars', envVars);
-        if (manifest.project?.prune ?? true) {
-            await pruneBranches(projectPrefix);
+const baseUri = 'https://secure.hosting.de/api';
+async function findActiveWebspaces(projectPrefix) {
+    const response = await _http.postJson(`${baseUri}/webhosting/v1/json/webspacesFind`, {
+        authToken: token,
+        filter: {
+            subFilterConnective: 'AND',
+            subFilter: [
+                {
+                    field: 'webspaceName',
+                    value: `${projectPrefix}-*`
+                },
+                {
+                    field: 'webspaceStatus',
+                    value: 'active'
+                }
+            ]
         }
-    }
-    catch (error) {
-        if (error instanceof Error)
-            core.setFailed(error.message);
-    }
+    });
+    return response.result?.response?.data ?? [];
 }
-exports.run = run;
-async function loadConfig(appKey) {
-    const manifest = yaml.load(fs.readFileSync('./.hosting/config.yaml', 'utf8'));
-    const app = manifest.applications[appKey] ?? null;
-    if (null === app) {
-        throw new Error(`Cannot find "applications.${appKey}" in the ".hosting/config.yaml" manifest.`);
-    }
-    return { manifest, app };
-}
-async function getWebspace(webspaceName, app) {
-    let webspace = await findOneWebspaceByName(webspaceName);
-    if (null !== webspace) {
-        core.info(`Using webspace ${webspaceName} (${webspace.id})`);
-        core.setOutput('shall-sync', false);
-        return webspace;
-    }
-    core.info('Creating a new webspace...');
-    core.setOutput('shall-sync', true);
-    webspace = await createWebspace(app, webspaceName);
-    do {
-        await (0, wait_1.wait)(2000);
-        core.info(`Waiting for webspace ${webspaceName} (${webspace.id}) to boot...`);
-        webspace = await findWebspaceById(webspace.id);
-        if (null === webspace) {
-            throw new Error(`Unexpected error.`);
-        }
-    } while ('active' !== webspace.status);
-    return webspace;
-}
-async function getWebspaceAccess(webspace) {
-    const availableUsers = await findWebspaceUsers();
-    const webspaceAccess = webspace.accesses.find(a => availableUsers.find(u => u.id === a.userId)) ??
-        null;
-    if (null === webspaceAccess) {
-        throw new Error(`It seems that the SSH access to the webspace was revoked for the github-action.`);
-    }
-    return webspaceAccess;
-}
-async function configureVhosts(app, ref, manifest, appKey, foundVhosts, webspace, httpUser) {
-    for (const [domainName, web] of Object.entries(app.web)) {
-        const actualDomainName = translateDomainName(domainName, ref, manifest, appKey);
-        let vhost = foundVhosts.find(v => v.domainName === actualDomainName) ?? null;
-        if (null === vhost) {
-            core.info(`Configuring ${actualDomainName}...`);
-            vhost = await createVhost(webspace, web, app, actualDomainName);
-        }
-        else if (mustBeUpdated(vhost, app, web)) {
-            core.info(`Configuring ${actualDomainName}...`);
-            // todo
-        }
-        core.setOutput('deploy-path', `/home/${httpUser}/html`);
-        core.setOutput('public-url', `https://${vhost.domainName}`);
-    }
-}
-async function pruneVhosts(foundVhosts, app, ref, manifest, appKey) {
-    for (const relict of foundVhosts.filter(v => !Object.keys(app.web)
-        .map(domainName => translateDomainName(domainName, ref, manifest, appKey))
-        .includes(v.domainName))) {
-        core.info(`Deleting ${relict.domainName}...`);
-        await deleteVhostById(relict.id);
-    }
-}
-async function configureDatabases(app, databasePrefix, appKey, foundDatabases, envVars) {
-    for (const [relationName, databaseName] of Object.entries(app.databases ?? {})) {
-        const databaseInternalName = `${databasePrefix}-${databaseName.toLowerCase()}`;
-        const dbUserName = `${databasePrefix}-${appKey}--${relationName.toLowerCase()}`;
-        const existingDatabase = foundDatabases.find(d => d.name === databaseInternalName) ?? null;
-        if (null !== existingDatabase) {
-            const usersWithAccess = await findDatabaseAccesses(dbUserName, existingDatabase.id);
-            if (!usersWithAccess.length) {
-                core.info(`Granting access on database ${databaseInternalName}`);
-                const { database, databaseUserName, databasePassword } = await addDatabaseAccess(existingDatabase, dbUserName, app);
-                defineEnv(envVars, relationName, database, databaseUserName, databasePassword);
-            }
-        }
-        else {
-            core.info(`Creating database ${databaseInternalName}`);
-            const { database, databaseUserName, databasePassword } = await createDatabase(app, dbUserName, databaseInternalName);
-            defineEnv(envVars, relationName, database, databaseUserName, databasePassword);
-        }
-    }
-}
-function defineEnv(envVars, relationName, database, databaseUserName, databasePassword) {
-    Object.assign(envVars, Object.fromEntries([
-        [`${relationName.toUpperCase()}_SERVER`, `mysql://${database.hostName}`],
-        [`${relationName.toUpperCase()}_DRIVER`, 'mysql'],
-        [`${relationName.toUpperCase()}_HOST`, database.hostName],
-        [`${relationName.toUpperCase()}_PORT`, 3306],
-        [`${relationName.toUpperCase()}_NAME`, database.dbName],
-        [`${relationName.toUpperCase()}_USERNAME`, databaseUserName],
-        [`${relationName.toUpperCase()}_PASSWORD`, databasePassword],
-        [
-            `${relationName.toUpperCase()}_URL`,
-            `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
-        ]
-    ]));
-    core.setSecret(databaseUserName);
-    core.setSecret(databasePassword);
-}
-async function pruneDatabases(manifest, databasePrefix, foundDatabases) {
-    const allDatabaseNames = Object.values(manifest.applications).reduce((dbNames, a) => dbNames.concat(Object.values(a.databases ?? {})), []);
-    for (const relict of foundDatabases.filter(v => !allDatabaseNames
-        .map(n => `${databasePrefix}-${n.toLowerCase()}`)
-        .includes(v.name))) {
-        core.info(`Deleting database ${relict.name}`);
-        await deleteDatabaseById(relict.id);
-    }
-}
-async function pruneBranches(projectPrefix) {
-    const branches = (process.env.REPO_BRANCHES ?? '').split(' ');
-    if (branches.length < 2) {
-        return;
-    }
-    const allWebspaces = await findWebspaces(projectPrefix);
-    for (const webspace of allWebspaces) {
-        const match = webspace.name.match(/\w+-(.+)-\w+/);
-        if (null === match) {
-            continue;
-        }
-        if (!branches.includes(match[1])) {
-            core.info(`Deleting webspace ${webspace.name}`);
-            await deleteWebspaceById(webspace.id);
-            const databases = await findDatabasesByWebspace(`${projectPrefix}-${match[1]}`.trim());
-            for (const d of databases) {
-                core.info(`Deleting database ${d.name}`);
-                await deleteDatabaseById(d.id);
-            }
-        }
-    }
-}
-function translateDomainName(domainName, environment, manifest, app) {
-    if ('_' === domainName) {
-        domainName = process.env.DOMAIN_NAME ?? '';
-    }
-    const previewDomain = manifest.project?.domain ?? null;
-    if (null !== previewDomain &&
-        ('' === domainName || environment !== (manifest.project?.parent ?? ''))) {
-        domainName = previewDomain;
-    }
-    if ('' === domainName) {
-        throw new Error(`No domain name configured for the app defined under "applications.${app}". ` +
-            `Please provide the variable "DOMAIN_NAME" under Github's environment settings. ` +
-            `Alternatively, set the domain name via "applications.${app}.web.locations[_]".`);
-    }
-    // POC
-    // if (null !== (web.environments ?? null) && environment in web.environments) {
-    //   return web.environments[environment]
-    // }
-    return domainName.replace(/\{app}/gi, app).replace(/\{ref}/gi, environment);
-}
-function mustBeUpdated(vhost, app, web) {
-    const phpv = phpVersion(app);
-    if (phpv && phpv !== vhost.phpVersion) {
-        return true;
-    }
-    // todo phpini
-    if ((web.www ?? true) !== vhost.enableAlias) {
-        return true;
-    }
-    if (`current/${web.root ?? ''}`.replace(/\/$/, '') !== vhost.webRoot) {
-        return true;
-    }
-    // todo locations
-    return false;
-}
+exports.findActiveWebspaces = findActiveWebspaces;
 async function findOneWebspaceByName(webspaceName) {
-    const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/webspacesFind', {
+    const response = await _http.postJson(`${baseUri}/webhosting/v1/json/webspacesFind`, {
         authToken: token,
         limit: 1,
         filter: {
@@ -29297,27 +29107,9 @@ async function findOneWebspaceByName(webspaceName) {
     }
     return response.result?.response?.data[0] ?? null;
 }
-async function findWebspaces(prefix) {
-    const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/webspacesFind', {
-        authToken: token,
-        filter: {
-            subFilterConnective: 'AND',
-            subFilter: [
-                {
-                    field: 'webspaceName',
-                    value: `${prefix}-*`
-                },
-                {
-                    field: 'webspaceStatus',
-                    value: 'active'
-                }
-            ]
-        }
-    });
-    return response.result?.response?.data ?? [];
-}
+exports.findOneWebspaceByName = findOneWebspaceByName;
 async function findWebspaceById(webspaceId) {
-    const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/webspacesFind', {
+    const response = await _http.postJson(`${baseUri}/webhosting/v1/json/webspacesFind`, {
         authToken: token,
         limit: 1,
         filter: {
@@ -29327,26 +29119,9 @@ async function findWebspaceById(webspaceId) {
     });
     return response.result?.response?.data[0] ?? null;
 }
-async function deleteWebspaceById(webspaceId) {
-    await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/webspaceDelete', {
-        authToken: token,
-        webspaceId
-    });
-}
-async function deleteVhostById(vhostId) {
-    await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/vhostDelete', {
-        authToken: token,
-        vhostId
-    });
-}
-async function deleteDatabaseById(databaseId) {
-    await _http.postJson('https://secure.hosting.de/api/database/v1/json/databaseDelete', {
-        authToken: token,
-        databaseId
-    });
-}
+exports.findWebspaceById = findWebspaceById;
 async function findVhostByWebspace(webspaceId) {
-    const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/vhostsFind', {
+    const response = await _http.postJson(`${baseUri}/webhosting/v1/json/vhostsFind`, {
         authToken: token,
         filter: {
             subFilterConnective: 'AND',
@@ -29364,27 +29139,30 @@ async function findVhostByWebspace(webspaceId) {
     });
     return response.result?.response?.data ?? [];
 }
-async function findDatabaseAccesses(userName, databaseId) {
-    const response = await _http.postJson('https://secure.hosting.de/api/database/v1/json/usersFind', {
+exports.findVhostByWebspace = findVhostByWebspace;
+async function deleteWebspaceById(webspaceId) {
+    await _http.postJson(`${baseUri}/webhosting/v1/json/webspaceDelete`, {
         authToken: token,
-        filter: {
-            subFilterConnective: 'AND',
-            subFilter: [
-                {
-                    field: 'userName',
-                    value: userName
-                },
-                {
-                    field: 'userAccessesDatabaseId',
-                    value: databaseId
-                }
-            ]
-        }
+        webspaceId
     });
-    return response.result?.response?.data ?? [];
 }
-async function findDatabasesByWebspace(databasePrefix) {
-    const response = await _http.postJson('https://secure.hosting.de/api/database/v1/json/databasesFind', {
+exports.deleteWebspaceById = deleteWebspaceById;
+async function deleteVhostById(vhostId) {
+    await _http.postJson(`${baseUri}/webhosting/v1/json/vhostDelete`, {
+        authToken: token,
+        vhostId
+    });
+}
+exports.deleteVhostById = deleteVhostById;
+async function deleteDatabaseById(databaseId) {
+    await _http.postJson(`${baseUri}/database/v1/json/databaseDelete`, {
+        authToken: token,
+        databaseId
+    });
+}
+exports.deleteDatabaseById = deleteDatabaseById;
+async function findDatabasesByPrefix(databasePrefix) {
+    const response = await _http.postJson(`${baseUri}/database/v1/json/databasesFind`, {
         authToken: token,
         filter: {
             subFilterConnective: 'AND',
@@ -29402,8 +29180,29 @@ async function findDatabasesByWebspace(databasePrefix) {
     });
     return response.result?.response?.data ?? [];
 }
+exports.findDatabasesByPrefix = findDatabasesByPrefix;
+async function findDatabaseAccesses(userName, databaseId) {
+    const response = await _http.postJson(`${baseUri}/database/v1/json/usersFind`, {
+        authToken: token,
+        filter: {
+            subFilterConnective: 'AND',
+            subFilter: [
+                {
+                    field: 'userName',
+                    value: userName
+                },
+                {
+                    field: 'userAccessesDatabaseId',
+                    value: databaseId
+                }
+            ]
+        }
+    });
+    return response.result?.response?.data ?? [];
+}
+exports.findDatabaseAccesses = findDatabaseAccesses;
 async function findWebspaceUsers() {
-    const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/usersFind', {
+    const response = await _http.postJson(`${baseUri}/webhosting/v1/json/usersFind`, {
         authToken: token,
         filter: {
             field: 'userName',
@@ -29412,24 +29211,25 @@ async function findWebspaceUsers() {
     });
     return response.result?.response?.data ?? [];
 }
-async function createWebspace(manifest, name) {
+exports.findWebspaceUsers = findWebspaceUsers;
+async function createWebspace(name, poolId = null, accountId = null) {
     const user = await createWebspaceUser(name);
-    const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/webspaceCreate', {
+    const response = await _http.postJson(`${baseUri}/webhosting/v1/json/webspaceCreate`, {
+        poolId,
         authToken: token,
         webspace: {
             name,
-            comments: 'Created by setup-hostingde github action. Please do not change name.',
+            accountId,
+            comments: 'Created by github action. Please do not change name.',
             productCode: 'webhosting-webspace-v1-1m',
-            cronJobs: [],
-            accountId: manifest.account ?? null
+            cronJobs: []
         },
         accesses: [
             {
                 userId: user.id,
                 sshAccess: true
             }
-        ],
-        poolId: manifest.pool ?? null
+        ]
     });
     if (null === response.result) {
         throw new Error('Unexpected error');
@@ -29439,119 +29239,9 @@ async function createWebspace(manifest, name) {
     }
     return response.result.response;
 }
-async function createDatabase(manifest, dbUserName, databaseName) {
-    const { user, password } = await createDatabaseUser(dbUserName, manifest);
-    const response = await _http.postJson('https://secure.hosting.de/api/database/v1/json/databaseCreate', {
-        authToken: token,
-        database: {
-            name: databaseName,
-            comments: 'Created by setup-hostingde github action. Please do not change name.',
-            productCode: 'database-mariadb-single-v1-1m',
-            storageQuota: 512,
-            accountId: manifest.account ?? null
-        },
-        accesses: [
-            {
-                userId: user.id,
-                accessLevel: ['read', 'write', 'schema']
-            }
-        ],
-        poolId: manifest.pool ?? null
-    });
-    if (null === response.result) {
-        throw new Error('Unexpected error');
-    }
-    if ('error' === (response.result.status ?? null)) {
-        throw new Error(JSON.stringify(response.result.errors ?? []));
-    }
-    const database = response.result.response;
-    const access = database.accesses.find(a => a.userId === user.id) ?? null;
-    return {
-        database,
-        databaseUserName: access?.dbLogin ?? '',
-        databasePassword: password
-    };
-}
-async function addDatabaseAccess(database, dbUserName, manifest) {
-    const { user, password } = await createDatabaseUser(dbUserName, manifest);
-    const accesses = database.accesses;
-    accesses.push({
-        userId: user.id,
-        databaseId: database.id,
-        accessLevel: ['read', 'write', 'schema']
-    });
-    const response = await _http.postJson('https://secure.hosting.de/api/database/v1/json/databaseUpdate', {
-        authToken: token,
-        database: {
-            id: database.id,
-            name: database.name,
-            productCode: database.productCode,
-            forceSsl: database.forceSsl,
-            storageQuota: database.storageQuota,
-            comments: database.comments
-        },
-        accesses
-    });
-    if (null === response.result) {
-        throw new Error('Unexpected error');
-    }
-    if ('error' === (response.result.status ?? null)) {
-        throw new Error(JSON.stringify(response.result.errors ?? []));
-    }
-    const result = response.result.response;
-    const access = result.accesses.find(a => a.userId === user.id) ?? null;
-    return {
-        database: result,
-        databaseUserName: access?.dbLogin ?? '',
-        databasePassword: password
-    };
-}
-async function createWebspaceUser(webspaceName) {
-    const sshKey = core.getInput('ssh-public-key', { required: true });
-    const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/userCreate', {
-        authToken: token,
-        user: {
-            sshKey,
-            name: `github-action--${webspaceName}`,
-            comment: 'Created by setup-hostingde github action. Please do not remove.'
-        },
-        password: crypto_1.default.randomUUID()
-    });
-    if (null === response.result) {
-        throw new Error('Unexpected error');
-    }
-    if ('error' === (response.result.status ?? null)) {
-        throw new Error(JSON.stringify(response.result.errors ?? []));
-    }
-    return response.result.response;
-}
-async function createDatabaseUser(dbUserName, manifest) {
-    const password = crypto_1.default.randomUUID();
-    const response = await _http.postJson('https://secure.hosting.de/api/database/v1/json/userCreate', {
-        authToken: token,
-        user: {
-            name: dbUserName,
-            comment: 'Created by setup-hostingde github action. Please do not remove.',
-            accountId: manifest.account ?? null
-        },
-        password
-    });
-    if (null === response.result) {
-        throw new Error('Unexpected error');
-    }
-    if ('error' === (response.result.status ?? null)) {
-        throw new Error(JSON.stringify(response.result.errors ?? []));
-    }
-    return { user: response.result.response, password };
-}
-function transformPhpIni(ini) {
-    return Object.entries(ini).map(([k, v]) => ({ key: k, value: `${v}` }));
-}
-function phpVersion(app) {
-    return app.php?.version ?? process.env.PHP_VERSION ?? null;
-}
+exports.createWebspace = createWebspace;
 async function createVhost(webspace, web, app, domainName) {
-    const response = await _http.postJson('https://secure.hosting.de/api/webhosting/v1/json/vhostCreate', {
+    const response = await _http.postJson(`${baseUri}/webhosting/v1/json/vhostCreate`, {
         authToken: token,
         vhost: {
             domainName,
@@ -29560,7 +29250,7 @@ async function createVhost(webspace, web, app, domainName) {
             enableAlias: web.www ?? true,
             redirectToPrimaryName: true,
             redirectHttpToHttps: true,
-            phpVersion: phpVersion(app),
+            phpVersion: app.php?.version ?? node_process_1.default.env.PHP_VERSION ?? null,
             webRoot: `current/${web.root ?? ''}`.replace(/\/$/, ''),
             locations: Object.entries(web.locations ?? {}).map(function ([matchString, location]) {
                 return {
@@ -29593,6 +29283,475 @@ async function createVhost(webspace, web, app, domainName) {
         throw new Error(JSON.stringify(response.result.errors ?? []));
     }
     return response.result.response;
+}
+exports.createVhost = createVhost;
+async function createDatabase(dbUserName, databaseName, poolId = null, accountId = null) {
+    const { user, password } = await createDatabaseUser(dbUserName, accountId);
+    const response = await _http.postJson(`${baseUri}/database/v1/json/databaseCreate`, {
+        authToken: token,
+        poolId,
+        database: {
+            name: databaseName,
+            comments: 'Created by github action. Please do not change name.',
+            productCode: 'database-mariadb-single-v1-1m',
+            storageQuota: 512,
+            accountId
+        },
+        accesses: [
+            {
+                userId: user.id,
+                accessLevel: ['read', 'write', 'schema']
+            }
+        ]
+    });
+    if (null === response.result) {
+        throw new Error('Unexpected error');
+    }
+    if ('error' === (response.result.status ?? null)) {
+        throw new Error(JSON.stringify(response.result.errors ?? []));
+    }
+    const database = response.result.response;
+    const access = database.accesses.find(a => a.userId === user.id) ?? null;
+    return {
+        database,
+        databaseUserName: access?.dbLogin ?? '',
+        databasePassword: password
+    };
+}
+exports.createDatabase = createDatabase;
+async function addDatabaseAccess(database, dbUserName, accountId = null) {
+    const { user, password } = await createDatabaseUser(dbUserName, accountId);
+    const accesses = database.accesses;
+    accesses.push({
+        userId: user.id,
+        databaseId: database.id,
+        accessLevel: ['read', 'write', 'schema']
+    });
+    const response = await _http.postJson(`${baseUri}/database/v1/json/databaseUpdate`, {
+        authToken: token,
+        database: {
+            id: database.id,
+            name: database.name,
+            productCode: database.productCode,
+            forceSsl: database.forceSsl,
+            storageQuota: database.storageQuota,
+            comments: database.comments
+        },
+        accesses
+    });
+    if (null === response.result) {
+        throw new Error('Unexpected error');
+    }
+    if ('error' === (response.result.status ?? null)) {
+        throw new Error(JSON.stringify(response.result.errors ?? []));
+    }
+    const result = response.result.response;
+    const access = result.accesses.find(a => a.userId === user.id) ?? null;
+    return {
+        database: result,
+        databaseUserName: access?.dbLogin ?? '',
+        databasePassword: password
+    };
+}
+exports.addDatabaseAccess = addDatabaseAccess;
+async function createWebspaceUser(webspaceName) {
+    const sshKey = core.getInput('ssh-public-key', { required: true });
+    const response = await _http.postJson(`${baseUri}/webhosting/v1/json/userCreate`, {
+        authToken: token,
+        user: {
+            sshKey,
+            name: `github-action--${webspaceName}`,
+            comment: 'Created by github action. Please do not remove.'
+        },
+        password: crypto_1.default.randomUUID()
+    });
+    if (null === response.result) {
+        throw new Error('Unexpected error');
+    }
+    if ('error' === (response.result.status ?? null)) {
+        throw new Error(JSON.stringify(response.result.errors ?? []));
+    }
+    return response.result.response;
+}
+exports.createWebspaceUser = createWebspaceUser;
+async function createDatabaseUser(dbUserName, accountId = null) {
+    const password = crypto_1.default.randomUUID();
+    const response = await _http.postJson(`${baseUri}/database/v1/json/userCreate`, {
+        authToken: token,
+        user: {
+            name: dbUserName,
+            comment: 'Created by github action. Please do not remove.',
+            accountId
+        },
+        password
+    });
+    if (null === response.result) {
+        throw new Error('Unexpected error');
+    }
+    if ('error' === (response.result.status ?? null)) {
+        throw new Error(JSON.stringify(response.result.errors ?? []));
+    }
+    return { user: response.result.response, password };
+}
+exports.createDatabaseUser = createDatabaseUser;
+function transformPhpIni(ini) {
+    return Object.entries(ini).map(([k, v]) => ({ key: k, value: `${v}` }));
+}
+
+
+/***/ }),
+
+/***/ 6373:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.config = void 0;
+const yaml = __importStar(__nccwpck_require__(1917));
+const fs_1 = __importDefault(__nccwpck_require__(7147));
+async function config(appKey) {
+    const manifest = yaml.load(fs_1.default.readFileSync('./.hosting/config.yaml', 'utf8'));
+    const app = manifest.applications[appKey] ?? null;
+    if (null === app) {
+        throw new Error(`Cannot find "applications.${appKey}" in the ".hosting/config.yaml" manifest.`);
+    }
+    return { manifest, app };
+}
+exports.config = config;
+
+
+/***/ }),
+
+/***/ 399:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+// noinspection ExceptionCaughtLocallyJS
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.run = void 0;
+const core = __importStar(__nccwpck_require__(2186));
+const services = __importStar(__nccwpck_require__(3711));
+const process = __importStar(__nccwpck_require__(7742));
+const config_1 = __nccwpck_require__(6373);
+/**
+ * The main function for the action.
+ * @returns {Promise<void>} Resolves when the action is complete.
+ */
+async function run() {
+    try {
+        // https://github.com/actions/toolkit/issues/1315
+        const ref = process.env.GITHUB_REF_NAME ?? 'na';
+        const appKey = core.getInput('app', { required: true });
+        const projectPrefix = core.getInput('project-prefix', {
+            required: true
+        });
+        const webspaceName = `${projectPrefix}-${ref}-${appKey}`.trim();
+        const databasePrefix = `${projectPrefix}-${ref}`.trim();
+        const { manifest, app } = await (0, config_1.config)(appKey);
+        const { webspace, sshHost, sshUser, httpUser } = await services.getWebspace(webspaceName, app);
+        const { destinations } = await services.applyVhosts(webspace, app, manifest, ref, appKey, httpUser);
+        const { envVars } = await services.applyDatabases(databasePrefix, appKey, app, manifest);
+        core.setOutput('ssh-user', sshUser);
+        core.setOutput('ssh-host', sshHost);
+        core.setOutput('ssh-port', 2244);
+        core.setOutput('http-user', httpUser);
+        core.setOutput('env-vars', envVars);
+        core.setOutput('deploy-path', destinations[0].deployPath);
+        core.setOutput('public-url', destinations[0].publicUrl);
+        if (manifest.project?.prune ?? true) {
+            await services.pruneBranches(projectPrefix);
+        }
+    }
+    catch (error) {
+        if (error instanceof Error)
+            core.setFailed(error.message);
+    }
+}
+exports.run = run;
+
+
+/***/ }),
+
+/***/ 3711:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.pruneBranches = exports.pruneDatabases = exports.configureDatabases = exports.pruneVhosts = exports.configureVhosts = exports.getWebspaceAccess = exports.findOrCreateWebspace = exports.applyDatabases = exports.applyVhosts = exports.getWebspace = void 0;
+const client = __importStar(__nccwpck_require__(5707));
+const core = __importStar(__nccwpck_require__(2186));
+const node_process_1 = __importDefault(__nccwpck_require__(7742));
+const wait_1 = __nccwpck_require__(5259);
+async function getWebspace(webspaceName, app) {
+    const webspace = await findOrCreateWebspace(webspaceName, app);
+    const webspaceAccess = await getWebspaceAccess(webspace);
+    return {
+        webspace,
+        sshUser: webspaceAccess.userName,
+        sshHost: webspace.hostName,
+        httpUser: webspace.webspaceName
+    };
+}
+exports.getWebspace = getWebspace;
+async function applyVhosts(webspace, app, manifest, ref, appKey, httpUser) {
+    const foundVhosts = await client.findVhostByWebspace(webspace.id);
+    const destinations = [];
+    for (const [domainKey, web] of Object.entries(app.web)) {
+        const { domainName } = await configureVhosts(domainKey, web, app, ref, manifest, appKey, foundVhosts, webspace);
+        destinations.push({
+            deployPath: `/home/${httpUser}/html`,
+            publicUrl: `https://${domainName}`
+        });
+    }
+    await pruneVhosts(foundVhosts, app, ref, manifest, appKey);
+    return { destinations };
+}
+exports.applyVhosts = applyVhosts;
+async function applyDatabases(databasePrefix, appKey, app, manifest) {
+    const envVars = {};
+    const foundDatabases = await client.findDatabasesByPrefix(databasePrefix);
+    await configureDatabases(app, databasePrefix, appKey, foundDatabases, envVars);
+    await pruneDatabases(manifest, databasePrefix, foundDatabases);
+    return { envVars };
+}
+exports.applyDatabases = applyDatabases;
+async function findOrCreateWebspace(webspaceName, app) {
+    let webspace = await client.findOneWebspaceByName(webspaceName);
+    if (null !== webspace) {
+        core.info(`Using webspace ${webspaceName} (${webspace.id})`);
+        core.setOutput('shall-sync', false);
+        return webspace;
+    }
+    core.info('Creating a new webspace...');
+    core.setOutput('shall-sync', true);
+    webspace = await client.createWebspace(webspaceName, app.pool ?? null, app.account ?? null);
+    do {
+        await (0, wait_1.wait)(2000);
+        core.info(`Waiting for webspace ${webspaceName} (${webspace.id}) to boot...`);
+        webspace = await client.findWebspaceById(webspace.id);
+        if (null === webspace) {
+            throw new Error(`Unexpected error.`);
+        }
+    } while ('active' !== webspace.status);
+    return webspace;
+}
+exports.findOrCreateWebspace = findOrCreateWebspace;
+async function getWebspaceAccess(webspace) {
+    const availableUsers = await client.findWebspaceUsers();
+    const webspaceAccess = webspace.accesses.find(a => availableUsers.find(u => u.id === a.userId)) ??
+        null;
+    if (null === webspaceAccess) {
+        throw new Error(`It seems that the SSH access to the webspace was revoked for the github-action.`);
+    }
+    return webspaceAccess;
+}
+exports.getWebspaceAccess = getWebspaceAccess;
+async function configureVhosts(domainName, web, app, ref, manifest, appKey, foundVhosts, webspace) {
+    const actualDomainName = translateDomainName(domainName, ref, manifest, appKey);
+    let vhost = foundVhosts.find(v => v.domainName === actualDomainName) ?? null;
+    if (null === vhost) {
+        core.info(`Configuring ${actualDomainName}...`);
+        vhost = await client.createVhost(webspace, web, app, actualDomainName);
+    }
+    else if (mustBeUpdated(vhost, app, web)) {
+        core.info(`Configuring ${actualDomainName}...`);
+        // todo
+    }
+    return { domainName };
+}
+exports.configureVhosts = configureVhosts;
+async function pruneVhosts(foundVhosts, app, ref, manifest, appKey) {
+    for (const relict of foundVhosts.filter(v => !Object.keys(app.web)
+        .map(domainName => translateDomainName(domainName, ref, manifest, appKey))
+        .includes(v.domainName))) {
+        core.info(`Deleting ${relict.domainName}...`);
+        await client.deleteVhostById(relict.id);
+    }
+}
+exports.pruneVhosts = pruneVhosts;
+async function configureDatabases(app, databasePrefix, appKey, foundDatabases, envVars) {
+    for (const [relationName, databaseName] of Object.entries(app.databases ?? {})) {
+        const databaseInternalName = `${databasePrefix}-${databaseName.toLowerCase()}`;
+        const dbUserName = `${databasePrefix}-${appKey}--${relationName.toLowerCase()}`;
+        const existingDatabase = foundDatabases.find(d => d.name === databaseInternalName) ?? null;
+        if (null !== existingDatabase) {
+            const usersWithAccess = await client.findDatabaseAccesses(dbUserName, existingDatabase.id);
+            if (!usersWithAccess.length) {
+                core.info(`Granting access on database ${databaseInternalName}`);
+                const { database, databaseUserName, databasePassword } = await client.addDatabaseAccess(existingDatabase, dbUserName, app.account ?? null);
+                defineEnv(envVars, relationName, database, databaseUserName, databasePassword);
+            }
+        }
+        else {
+            core.info(`Creating database ${databaseInternalName}`);
+            const { database, databaseUserName, databasePassword } = await client.createDatabase(dbUserName, databaseInternalName, app.account ?? null);
+            defineEnv(envVars, relationName, database, databaseUserName, databasePassword);
+        }
+    }
+}
+exports.configureDatabases = configureDatabases;
+function defineEnv(envVars, relationName, database, databaseUserName, databasePassword) {
+    Object.assign(envVars, Object.fromEntries([
+        [`${relationName.toUpperCase()}_SERVER`, `mysql://${database.hostName}`],
+        [`${relationName.toUpperCase()}_DRIVER`, 'mysql'],
+        [`${relationName.toUpperCase()}_HOST`, database.hostName],
+        [`${relationName.toUpperCase()}_PORT`, 3306],
+        [`${relationName.toUpperCase()}_NAME`, database.dbName],
+        [`${relationName.toUpperCase()}_USERNAME`, databaseUserName],
+        [`${relationName.toUpperCase()}_PASSWORD`, databasePassword],
+        [
+            `${relationName.toUpperCase()}_URL`,
+            `mysql://${databaseUserName}:${encodeURIComponent(databasePassword)}@${database.hostName}:3306/${database.dbName}`
+        ]
+    ]));
+    core.setSecret(databaseUserName);
+    core.setSecret(databasePassword);
+}
+async function pruneDatabases(manifest, databasePrefix, foundDatabases) {
+    const allDatabaseNames = Object.values(manifest.applications).reduce((dbNames, a) => dbNames.concat(Object.values(a.databases ?? {})), []);
+    for (const relict of foundDatabases.filter(v => !allDatabaseNames
+        .map(n => `${databasePrefix}-${n.toLowerCase()}`)
+        .includes(v.name))) {
+        core.info(`Deleting database ${relict.name}`);
+        await client.deleteDatabaseById(relict.id);
+    }
+}
+exports.pruneDatabases = pruneDatabases;
+async function pruneBranches(projectPrefix) {
+    const branches = (node_process_1.default.env.REPO_BRANCHES ?? '').split(' ');
+    if (branches.length < 2) {
+        return;
+    }
+    const allWebspaces = await client.findActiveWebspaces(projectPrefix);
+    for (const webspace of allWebspaces) {
+        const match = webspace.name.match(/\w+-(.+)-\w+/);
+        if (null === match) {
+            continue;
+        }
+        if (!branches.includes(match[1])) {
+            core.info(`Deleting webspace ${webspace.name}`);
+            await client.deleteWebspaceById(webspace.id);
+            const databases = await client.findDatabasesByPrefix(`${projectPrefix}-${match[1]}`.trim());
+            for (const d of databases) {
+                core.info(`Deleting database ${d.name}`);
+                await client.deleteDatabaseById(d.id);
+            }
+        }
+    }
+}
+exports.pruneBranches = pruneBranches;
+function translateDomainName(domainName, environment, manifest, app) {
+    if ('_' === domainName) {
+        domainName = node_process_1.default.env.DOMAIN_NAME ?? '';
+    }
+    const previewDomain = manifest.project?.domain ?? null;
+    if (null !== previewDomain &&
+        ('' === domainName || environment !== (manifest.project?.parent ?? ''))) {
+        domainName = previewDomain;
+    }
+    if ('' === domainName) {
+        throw new Error(`No domain name configured for the app defined under "applications.${app}". ` +
+            `Please provide the variable "DOMAIN_NAME" under Github's environment settings. ` +
+            `Alternatively, set the domain name via "applications.${app}.web.locations[_]".`);
+    }
+    // POC
+    // if (null !== (web.environments ?? null) && environment in web.environments) {
+    //   return web.environments[environment]
+    // }
+    return domainName.replace(/\{app}/gi, app).replace(/\{ref}/gi, environment);
+}
+function mustBeUpdated(vhost, app, web) {
+    const phpv = app.php?.version ?? node_process_1.default.env.PHP_VERSION ?? null;
+    if (phpv && phpv !== vhost.phpVersion) {
+        return true;
+    }
+    // todo phpini
+    if ((web.www ?? true) !== vhost.enableAlias) {
+        return true;
+    }
+    if (`current/${web.root ?? ''}`.replace(/\/$/, '') !== vhost.webRoot) {
+        return true;
+    }
+    // todo locations
+    return false;
 }
 
 
