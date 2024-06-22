@@ -29500,7 +29500,6 @@ async function run() {
         const webspaceName = `${projectPrefix}-${ref}-${appKey}`.trim();
         const databasePrefix = `${projectPrefix}-${ref}`.trim();
         const { manifest, app, envVars } = await (0, config_1.config)(appKey);
-        console.info(JSON.stringify(envVars));
         const { webspace, sshHost, sshUser, httpUser } = await services.getWebspace(webspaceName, app);
         const { destinations } = await services.applyVhosts(webspace, app, manifest, ref, appKey, httpUser);
         const { envVars: dbEnvVars } = await services.applyDatabases(databasePrefix, appKey, app, manifest);
