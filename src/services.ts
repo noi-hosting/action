@@ -235,7 +235,7 @@ export async function configureDatabases(
         await client.createDatabase(
           dbUserName,
           databaseInternalName,
-          app.account ?? null
+          app.pool ?? null
         )
 
       defineEnv(

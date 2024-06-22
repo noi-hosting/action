@@ -29684,7 +29684,7 @@ async function configureDatabases(app, databasePrefix, appKey, foundDatabases, e
         }
         else {
             core.info(`Creating database ${databaseInternalName}`);
-            const { database, databaseUserName, databasePassword } = await client.createDatabase(dbUserName, databaseInternalName, app.account ?? null);
+            const { database, databaseUserName, databasePassword } = await client.createDatabase(dbUserName, databaseInternalName, app.pool ?? null);
             defineEnv(envVars, relationName, database, databaseUserName, databasePassword);
         }
     }
