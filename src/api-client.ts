@@ -191,7 +191,8 @@ export async function createWebspace(
   cronjobs: CronjobConfig[],
   phpVersion: string | null,
   poolId: string | null = null,
-  accountId: string | null = null
+  accountId: string | null = null,
+  redisEnabled = false
 ): Promise<WebspaceResult> {
   const user = await createWebspaceUser(name)
 
@@ -205,7 +206,7 @@ export async function createWebspace(
         comments: 'Created by github action. Please do not change name.',
         productCode: 'webhosting-webspace-v1-1m',
         cronJobs: cronjobs.map(c => transformCronJob(c, phpVersion)),
-        redisEnabled: false
+        redisEnabled
       },
       accesses: [
         {
@@ -213,6 +214,41 @@ export async function createWebspace(
           sshAccess: true
         }
       ]
+    })
+
+  if (null === response.result) {
+    throw new Error('Unexpected error')
+  }
+
+  if ('error' === (response.result.status ?? null)) {
+    throw new Error(JSON.stringify(response.result.errors ?? []))
+  }
+
+  return response.result.response
+}
+
+export async function updateWebspace(
+  originalWebspace: WebspaceResult,
+  phpVersion: string | null,
+  cronjobs: CronjobConfig[] | null = null,
+  redisEnabled = false
+): Promise<WebspaceResult> {
+  const webspace = originalWebspace
+  const accesses = originalWebspace.accesses
+
+  if (null !== cronjobs) {
+    webspace.cronJobs = cronjobs.map(c => transformCronJob(c, phpVersion))
+  }
+
+  if (null !== redisEnabled) {
+    webspace.redisEnabled = redisEnabled
+  }
+
+  const response: TypedResponse<ApiActionResponse<WebspaceResult>> =
+    await _http.postJson(`${baseUri}/webhosting/v1/json/webspaceUpdate`, {
+      authToken: token,
+      webspace,
+      accesses
     })
 
   if (null === response.result) {
@@ -441,11 +477,23 @@ function transformPhpIni(ini: object): object {
   return Object.entries(ini).map(([k, v]) => ({ key: k, value: `${v}` }))
 }
 
-function transformCronJob(
+export function transformCronJob(
   config: CronjobConfig,
   phpVersion: string | null
 ): CronJob {
-  const cronjob = {} as CronJob
+  // Use default values so that _.isEqual comparison works
+  const cronjob = {
+    type: '',
+    comments: '',
+    script: '',
+    parameters: [],
+    url: null,
+    interpreterVersion: null,
+    schedule: '',
+    daypart: null,
+    weekday: null,
+    dayOfMonth: null
+  } as CronJob
 
   if (config.php !== undefined && config.php !== null) {
     const [script, ...parameters] = config.php.split(' ')

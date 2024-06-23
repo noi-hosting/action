@@ -2,9 +2,11 @@ import * as client from './api-client'
 import * as core from '@actions/core'
 import process from 'node:process'
 import { wait } from './wait'
+import * as _ from 'lodash'
 import { Manifest, ManifestApp, ManifestAppWeb } from './config'
 import {
   DatabaseResult,
+  transformCronJob,
   VhostResult,
   WebspaceAccess,
   WebspaceResult
@@ -86,11 +88,32 @@ export async function findOrCreateWebspace(
   webspaceName: string,
   app: ManifestApp
 ): Promise<WebspaceResult> {
+  const phpv = app.php?.version ?? process.env.PHP_VERSION ?? null
+  const redisEnabled = !!(
+    app.php?.ini !== undefined &&
+    'extension=redis.so' in app.php.ini &&
+    app.php.ini['extension=redis.so']
+  )
   let webspace: WebspaceResult | null =
     await client.findOneWebspaceByName(webspaceName)
+
   if (null !== webspace) {
     core.info(`Using webspace ${webspaceName} (${webspace.id})`)
     core.setOutput('shall-sync', false)
+
+    if (
+      !_.isEqual(
+        webspace.cronJobs,
+        app.cron.map(c => transformCronJob(c, phpv))
+      )
+    ) {
+      webspace = await client.updateWebspace(
+        webspace,
+        phpv,
+        app.cron,
+        redisEnabled
+      )
+    }
 
     return webspace
   }
@@ -98,14 +121,13 @@ export async function findOrCreateWebspace(
   core.info('Creating a new webspace...')
   core.setOutput('shall-sync', true)
 
-  const phpv = app.php?.version ?? process.env.PHP_VERSION ?? null
-
   webspace = await client.createWebspace(
     webspaceName,
     app.cron,
     phpv,
     app.pool ?? null,
-    app.account ?? null
+    app.account ?? null,
+    redisEnabled
   )
 
   do {
