@@ -109,6 +109,7 @@ export async function findOrCreateWebspace(
     ) {
       core.info(`Using webspace ${webspaceName} (${webspace.id})`)
     } else {
+      core.info(JSON.stringify(webspace.cronJobs))
       core.info(`Updating webspace ${webspaceName} (${webspace.id})`)
 
       webspace = await client.updateWebspace(

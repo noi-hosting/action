@@ -46654,12 +46654,14 @@ function transformCronJob(config, phpVersion) {
     };
     if (config.php !== undefined && config.php !== null) {
         const [script, ...parameters] = config.php.split(' ');
+        cronjob.type = 'php';
         cronjob.script = script;
         cronjob.parameters = parameters;
         cronjob.interpreterVersion = phpVersion;
     }
     else if (config.cmd !== undefined && config.cmd !== null) {
         const [script, ...parameters] = config.cmd.split(' ');
+        cronjob.type = 'bash';
         cronjob.script = script;
         cronjob.parameters = parameters;
     }
@@ -46903,6 +46905,7 @@ async function findOrCreateWebspace(webspaceName, app) {
             core.info(`Using webspace ${webspaceName} (${webspace.id})`);
         }
         else {
+            core.info(JSON.stringify(webspace.cronJobs));
             core.info(`Updating webspace ${webspaceName} (${webspace.id})`);
             webspace = await client.updateWebspace(webspace, phpv, app.cron, redisEnabled);
         }
