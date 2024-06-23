@@ -29212,7 +29212,7 @@ async function findWebspaceUsers() {
     return response.result?.response?.data ?? [];
 }
 exports.findWebspaceUsers = findWebspaceUsers;
-async function createWebspace(name, poolId = null, accountId = null) {
+async function createWebspace(name, cronjobs, phpVersion, poolId = null, accountId = null) {
     const user = await createWebspaceUser(name);
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/webspaceCreate`, {
         poolId,
@@ -29222,7 +29222,8 @@ async function createWebspace(name, poolId = null, accountId = null) {
             accountId,
             comments: 'Created by github action. Please do not change name.',
             productCode: 'webhosting-webspace-v1-1m',
-            cronJobs: []
+            cronJobs: cronjobs.map(c => transformCronJob(c, phpVersion)),
+            redisEnabled: false
         },
         accesses: [
             {
@@ -29396,6 +29397,46 @@ async function createDatabaseUser(dbUserName, accountId = null) {
 exports.createDatabaseUser = createDatabaseUser;
 function transformPhpIni(ini) {
     return Object.entries(ini).map(([k, v]) => ({ key: k, value: `${v}` }));
+}
+function transformCronJob(config, phpVersion) {
+    const cronjob = {};
+    if (config.php !== undefined && config.php !== null) {
+        const [script, ...parameters] = config.php.split(' ');
+        cronjob.script = script;
+        cronjob.parameters = parameters;
+        cronjob.interpreterVersion = phpVersion;
+    }
+    else if (config.cmd !== undefined && config.cmd !== null) {
+        const [script, ...parameters] = config.cmd.split(' ');
+        cronjob.script = script;
+        cronjob.parameters = parameters;
+    }
+    else {
+        throw new Error('Please configure either "php" or "cmd" for the cron jobs');
+    }
+    let schedule = config.every;
+    switch (schedule) {
+        case 'day':
+            schedule = 'daily';
+            break;
+        case 'week':
+            schedule = 'weekly';
+            break;
+        case 'month':
+            schedule = 'monthly';
+            break;
+    }
+    cronjob.schedule = schedule;
+    if (schedule === 'weekly') {
+        cronjob.weekday = (config.on ?? 'Mon').toLowerCase();
+    }
+    else if (schedule === 'monthly') {
+        cronjob.dayOfMonth = config.on ?? 1;
+    }
+    else if (schedule === 'daily') {
+        cronjob.daypart = config.on ?? '1-5';
+    }
+    return cronjob;
 }
 
 
@@ -29603,7 +29644,8 @@ async function findOrCreateWebspace(webspaceName, app) {
     }
     core.info('Creating a new webspace...');
     core.setOutput('shall-sync', true);
-    webspace = await client.createWebspace(webspaceName, app.pool ?? null, app.account ?? null);
+    const phpv = app.php?.version ?? node_process_1.default.env.PHP_VERSION ?? null;
+    webspace = await client.createWebspace(webspaceName, app.cron, phpv, app.pool ?? null, app.account ?? null);
     do {
         await (0, wait_1.wait)(2000);
         core.info(`Waiting for webspace ${webspaceName} (${webspace.id}) to boot...`);

@@ -97,8 +97,13 @@ export async function findOrCreateWebspace(
 
   core.info('Creating a new webspace...')
   core.setOutput('shall-sync', true)
+
+  const phpv = app.php?.version ?? process.env.PHP_VERSION ?? null
+
   webspace = await client.createWebspace(
     webspaceName,
+    app.cron,
+    phpv,
     app.pool ?? null,
     app.account ?? null
   )

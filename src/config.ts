@@ -50,6 +50,7 @@ interface ManifestApp {
   web: {
     [domainName: string]: ManifestAppWeb
   }
+  cron: CronjobConfig[]
 }
 
 interface ManifestAppWeb {
@@ -64,4 +65,11 @@ interface ManifestAppWeb {
   }
 }
 
-export { Manifest, ManifestApp, ManifestAppWeb }
+interface CronjobConfig {
+  php?: string
+  cmd?: string
+  every: string
+  on: string
+}
+
+export { Manifest, ManifestApp, ManifestAppWeb, CronjobConfig }

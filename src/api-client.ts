@@ -2,7 +2,7 @@ import * as core from '@actions/core'
 import crypto from 'crypto'
 import { HttpClient } from '@actions/http-client'
 import { TypedResponse } from '@actions/http-client/lib/interfaces'
-import { ManifestApp, ManifestAppWeb } from './config'
+import { CronjobConfig, ManifestApp, ManifestAppWeb } from './config'
 import process from 'node:process'
 
 const _http = new HttpClient()
@@ -188,6 +188,8 @@ export async function findWebspaceUsers(): Promise<WebspaceUserResult[]> {
 
 export async function createWebspace(
   name: string,
+  cronjobs: CronjobConfig[],
+  phpVersion: string | null,
   poolId: string | null = null,
   accountId: string | null = null
 ): Promise<WebspaceResult> {
@@ -202,7 +204,8 @@ export async function createWebspace(
         accountId,
         comments: 'Created by github action. Please do not change name.',
         productCode: 'webhosting-webspace-v1-1m',
-        cronJobs: []
+        cronJobs: cronjobs.map(c => transformCronJob(c, phpVersion)),
+        redisEnabled: false
       },
       accesses: [
         {
@@ -438,6 +441,53 @@ function transformPhpIni(ini: object): object {
   return Object.entries(ini).map(([k, v]) => ({ key: k, value: `${v}` }))
 }
 
+function transformCronJob(
+  config: CronjobConfig,
+  phpVersion: string | null
+): CronJob {
+  const cronjob = {} as CronJob
+
+  if (config.php !== undefined && config.php !== null) {
+    const [script, ...parameters] = config.php.split(' ')
+
+    cronjob.script = script
+    cronjob.parameters = parameters
+    cronjob.interpreterVersion = phpVersion
+  } else if (config.cmd !== undefined && config.cmd !== null) {
+    const [script, ...parameters] = config.cmd.split(' ')
+
+    cronjob.script = script
+    cronjob.parameters = parameters
+  } else {
+    throw new Error('Please configure either "php" or "cmd" for the cron jobs')
+  }
+
+  let schedule = config.every
+  switch (schedule) {
+    case 'day':
+      schedule = 'daily'
+      break
+    case 'week':
+      schedule = 'weekly'
+      break
+    case 'month':
+      schedule = 'monthly'
+      break
+  }
+
+  cronjob.schedule = schedule
+
+  if (schedule === 'weekly') {
+    cronjob.weekday = (config.on ?? 'Mon').toLowerCase()
+  } else if (schedule === 'monthly') {
+    cronjob.dayOfMonth = config.on ?? 1
+  } else if (schedule === 'daily') {
+    cronjob.daypart = config.on ?? '1-5'
+  }
+
+  return cronjob
+}
+
 interface ApiResponse {
   errors: object[]
   metadata: {
@@ -492,9 +542,23 @@ interface WebspaceResult {
   productCode: string
   hostName: string
   poolId: string
-  cronJobs: object[]
+  cronJobs: CronJob[]
+  redisEnabled: boolean
   status: string
   accesses: WebspaceAccess[]
+}
+
+interface CronJob {
+  type: string
+  comments: string
+  script: string
+  parameters?: string[]
+  url?: string | null
+  interpreterVersion?: string | null
+  schedule: string
+  daypart?: string | null
+  weekday?: string | null
+  dayOfMonth?: string | null
 }
 
 interface UserResult {
