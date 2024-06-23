@@ -487,12 +487,13 @@ export function transformCronJob(
     comments: '',
     script: '',
     parameters: [],
-    url: null,
+    url: '',
     interpreterVersion: null,
     schedule: '',
-    daypart: null,
-    weekday: null,
-    dayOfMonth: null
+    weekday: '',
+    dayOfMonth: 0,
+    hour: 0,
+    minute: 0
   } as CronJob
 
   if (config.php !== undefined && config.php !== null) {
@@ -512,6 +513,8 @@ export function transformCronJob(
     throw new Error('Please configure either "php" or "cmd" for the cron jobs')
   }
 
+  cronjob.comments = 'Created by github action. Please do not change.'
+
   let schedule = config.every
   switch (schedule) {
     case 'day':
@@ -530,7 +533,7 @@ export function transformCronJob(
   if (schedule === 'weekly') {
     cronjob.weekday = (config.on ?? 'Mon').toLowerCase()
   } else if (schedule === 'monthly') {
-    cronjob.dayOfMonth = config.on ?? 1
+    cronjob.dayOfMonth = Number(config.on ?? 1)
   } else if (schedule === 'daily') {
     cronjob.daypart = config.on ?? '1-5'
   }
@@ -603,12 +606,12 @@ interface CronJob {
   comments: string
   script: string
   parameters?: string[]
-  url?: string | null
+  url?: string
   interpreterVersion?: string | null
   schedule: string
   daypart?: string | null
-  weekday?: string | null
-  dayOfMonth?: string | null
+  weekday?: string
+  dayOfMonth?: number
 }
 
 interface UserResult {

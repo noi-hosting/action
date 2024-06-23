@@ -46645,12 +46645,13 @@ function transformCronJob(config, phpVersion) {
         comments: '',
         script: '',
         parameters: [],
-        url: null,
+        url: '',
         interpreterVersion: null,
         schedule: '',
-        daypart: null,
-        weekday: null,
-        dayOfMonth: null
+        weekday: '',
+        dayOfMonth: 0,
+        hour: 0,
+        minute: 0
     };
     if (config.php !== undefined && config.php !== null) {
         const [script, ...parameters] = config.php.split(' ');
@@ -46668,6 +46669,7 @@ function transformCronJob(config, phpVersion) {
     else {
         throw new Error('Please configure either "php" or "cmd" for the cron jobs');
     }
+    cronjob.comments = 'Created by github action. Please do not change.';
     let schedule = config.every;
     switch (schedule) {
         case 'day':
@@ -46685,7 +46687,7 @@ function transformCronJob(config, phpVersion) {
         cronjob.weekday = (config.on ?? 'Mon').toLowerCase();
     }
     else if (schedule === 'monthly') {
-        cronjob.dayOfMonth = config.on ?? 1;
+        cronjob.dayOfMonth = Number(config.on ?? 1);
     }
     else if (schedule === 'daily') {
         cronjob.daypart = config.on ?? '1-5';
