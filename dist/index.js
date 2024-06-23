@@ -46641,24 +46641,25 @@ function transformPhpIni(ini) {
 function transformCronJob(config, phpVersion) {
     // Use default values so that _.isEqual comparison works
     const cronjob = {
-        type: '',
         comments: '',
-        script: '',
-        parameters: [],
-        url: '',
-        interpreterVersion: null,
-        schedule: '',
-        weekday: '',
         dayOfMonth: 0,
+        daypart: '',
         hour: 0,
-        minute: 0
+        interpreterVersion: '',
+        minute: 0,
+        parameters: [],
+        schedule: '',
+        script: '',
+        type: '',
+        url: '',
+        weekday: ''
     };
     if (config.php !== undefined && config.php !== null) {
         const [script, ...parameters] = config.php.split(' ');
         cronjob.type = 'php';
         cronjob.script = script;
         cronjob.parameters = parameters;
-        cronjob.interpreterVersion = phpVersion;
+        cronjob.interpreterVersion = phpVersion ?? '';
     }
     else if (config.cmd !== undefined && config.cmd !== null) {
         const [script, ...parameters] = config.cmd.split(' ');

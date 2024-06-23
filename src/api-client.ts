@@ -483,17 +483,18 @@ export function transformCronJob(
 ): CronJob {
   // Use default values so that _.isEqual comparison works
   const cronjob = {
-    type: '',
     comments: '',
-    script: '',
-    parameters: [],
-    url: '',
-    interpreterVersion: null,
-    schedule: '',
-    weekday: '',
     dayOfMonth: 0,
+    daypart: '',
     hour: 0,
-    minute: 0
+    interpreterVersion: '',
+    minute: 0,
+    parameters: [],
+    schedule: '',
+    script: '',
+    type: '',
+    url: '',
+    weekday: ''
   } as CronJob
 
   if (config.php !== undefined && config.php !== null) {
@@ -502,7 +503,7 @@ export function transformCronJob(
     cronjob.type = 'php'
     cronjob.script = script
     cronjob.parameters = parameters
-    cronjob.interpreterVersion = phpVersion
+    cronjob.interpreterVersion = phpVersion ?? ''
   } else if (config.cmd !== undefined && config.cmd !== null) {
     const [script, ...parameters] = config.cmd.split(' ')
 
@@ -607,7 +608,7 @@ interface CronJob {
   script: string
   parameters?: string[]
   url?: string
-  interpreterVersion?: string | null
+  interpreterVersion?: string
   schedule: string
   daypart?: string | null
   weekday?: string
