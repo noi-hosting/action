@@ -98,15 +98,19 @@ export async function findOrCreateWebspace(
     await client.findOneWebspaceByName(webspaceName)
 
   if (null !== webspace) {
-    core.info(`Using webspace ${webspaceName} (${webspace.id})`)
     core.setOutput('shall-sync', false)
 
     if (
-      !_.isEqual(
+      _.isEqual(
         webspace.cronJobs,
         app.cron.map(c => transformCronJob(c, phpv))
-      )
+      ) &&
+      redisEnabled === (webspace.redisEnabled ?? false)
     ) {
+      core.info(`Using webspace ${webspaceName} (${webspace.id})`)
+    } else {
+      core.info(`Updating webspace ${webspaceName} (${webspace.id})`)
+
       webspace = await client.updateWebspace(
         webspace,
         phpv,

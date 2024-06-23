@@ -46897,9 +46897,13 @@ async function findOrCreateWebspace(webspaceName, app) {
         app.php.ini['extension=redis.so']);
     let webspace = await client.findOneWebspaceByName(webspaceName);
     if (null !== webspace) {
-        core.info(`Using webspace ${webspaceName} (${webspace.id})`);
         core.setOutput('shall-sync', false);
-        if (!_.isEqual(webspace.cronJobs, app.cron.map(c => (0, api_client_1.transformCronJob)(c, phpv)))) {
+        if (_.isEqual(webspace.cronJobs, app.cron.map(c => (0, api_client_1.transformCronJob)(c, phpv))) &&
+            redisEnabled === (webspace.redisEnabled ?? false)) {
+            core.info(`Using webspace ${webspaceName} (${webspace.id})`);
+        }
+        else {
+            core.info(`Updating webspace ${webspaceName} (${webspace.id})`);
             webspace = await client.updateWebspace(webspace, phpv, app.cron, redisEnabled);
         }
         return webspace;
