@@ -72,7 +72,7 @@ runs:
     # Create all the web-spaces, vhosts and databases via the Hosting.de API
     - name: Setup Hosting.de environment
       id: hosting
-      uses: richardhj/setup-hostingde@main
+      uses: richardhj/setup-hostingde/setup@main
       with:
         auth-token: ${{ inputs.auth-token }}
         app: ${{ inputs.app }}
