@@ -1,9 +1,9 @@
 // noinspection ExceptionCaughtLocallyJS
 
 import * as core from '@actions/core'
-import * as services from './services'
+import * as services from '../services'
 import * as process from 'node:process'
-import { config } from './config'
+import { config } from '../config'
 
 /**
  * The main function for the action.

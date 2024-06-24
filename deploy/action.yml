@@ -1,0 +1,144 @@
+name: Deploy to Hosting.de
+description:
+  Sets ups web-spaces on Hosting.de, persists environment variables and syncs
+  contents among environments.
+branding:
+  icon: 'arrow-right-circle'
+  color: 'gray-dark'
+inputs:
+  auth-token:
+    description: The API authentication token, from the Hosting.de admin panel.
+    required: true
+  app:
+    description:
+      You can only deploy one app on a time, provide the key of the current
+      application in the yaml manifest.
+    default: app
+  project-prefix:
+    description:
+      A prefix used to identify resources on Hosting.de. Must be kept unique
+      under all projects under the account. Keep it short, e.g. `project1`
+    required: true
+  ssh-public-key:
+    description: The SSH public key for deploying.
+    required: true
+  ssh-private-key:
+    description: The SSH private key for deploying.
+    required: true
+  dotenv:
+    description: A .env file contents to write on the remote host.
+  dotenv-name:
+    description: Name of the `.env` file.
+    default: '.env.local'
+  php-version:
+    description: The php version used for build step.
+    required: true
+  build:
+    description: Shell script for building environment before deployment
+
+outputs:
+  public-url:
+    description: The URL under that the deployment will be reachable.
+    value: ${{ steps.hosting.outputs.public-url }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Check Runner OS
+      if: ${{ runner.os != 'Linux' }}
+      shell: bash
+      run: |
+        echo "::error title=⛔ error hint::Support Linux Only"
+        exit 1
+    - name: Check Auth Info Empty
+      if: ${{ inputs.auth-token == '' }}
+      shell: bash
+      run: |
+        echo "::error title=⛔ error hint::auth-token is empty, maybe you need to populate it in the secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encrypted-secrets"
+        exit 1
+
+    # Explicitly use fetch-depth=0 to fetch all branches
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    # Gather all branches, we need the list to prune non-existing branches
+    - name: Gather all branches
+      shell: bash
+      run: |
+        echo REPO_BRANCHES=$(git branch -r --format='%(refname:short)' | sed 's|origin/||g' | tr '\n' ' ') >> "$GITHUB_ENV"
+
+    # Create all the web-spaces, vhosts and databases via the Hosting.de API
+    - name: Setup Hosting.de environment
+      id: hosting
+      uses: richardhj/setup-hostingde@main
+      with:
+        auth-token: ${{ inputs.auth-token }}
+        app: ${{ inputs.app }}
+        project-prefix: ${{ inputs.project-prefix }}
+        ssh-public-key: ${{ inputs.ssh-public-key }}
+
+    # Sync app
+    - name: Setup Hosting.de environment
+      if: ${{ steps.outputs.hosting.shall-sync }}
+      uses: richardhj/sync-hostingde@main
+      with:
+        from: '' # parent
+        to: ${{ github.ref_name }} # must not be a parent environment
+        app: ${{ inputs.app }} # allow empty
+
+    # We need jq for json processing
+    - name: Install jq
+      uses: dcarbone/install-jq-action@v2
+
+    # We need SSH in the following
+    - name: Setup SSH environment
+      uses: shimataro/ssh-key-action@v2
+      with:
+        key: ${{ inputs.ssh-private-key }}
+        known_hosts: unnecessary
+
+    # The current folder must be a symlink
+    - name: Remove "current" directory
+      shell: bash
+      run: |
+        ssh -l "${{ steps.hosting.outputs.ssh-user }}" -p "${{ steps.hosting.outputs.ssh-port }}" "${{ steps.hosting.outputs.ssh-host }}" -o StrictHostKeyChecking=no "[ ! -L ${{ steps.hosting.outputs.deploy-path }}/current ] && [ -d ${{ steps.hosting.outputs.deploy-path }}/current ] && rm -r ${{ steps.hosting.outputs.deploy-path }}/current || true"
+
+    # Write both user-provided and environment-provided environment variables to the remote host
+    - name: Put environment variables
+      shell: bash
+      env:
+        USER_DOTENV: ${{ inputs.dotenv }}
+      run: |
+        HOSTING_ENV=$(echo '${{ steps.hosting.outputs.env-vars }}' | jq -r 'to_entries[] | "\(.key)=\(.value)"')
+        HOSTING_ENV=$HOSTING_ENV"\n"$USER_DOTENV
+
+        ssh -l "${{ steps.hosting.outputs.ssh-user }}" -p "${{ steps.hosting.outputs.ssh-port }}" "${{ steps.hosting.outputs.ssh-host }}" -o StrictHostKeyChecking=no "mkdir -p ${{ steps.hosting.outputs.deploy-path }}/shared && touch ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-name }}"
+        echo -e "$HOSTING_ENV" | ssh -l "${{ steps.hosting.outputs.ssh-user }}" -p "${{ steps.hosting.outputs.ssh-port }}" "${{ steps.hosting.outputs.ssh-host }}" -o StrictHostKeyChecking=no -T "cat >> ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-name }}"
+        ssh -l "${{ steps.hosting.outputs.ssh-user }}" -p "${{ steps.hosting.outputs.ssh-port }}" "${{ steps.hosting.outputs.ssh-host }}" -o StrictHostKeyChecking=no "tac ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-name }} | awk -F '=' '!seen["'$1'"]++' | tac > ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-name }}.tmp && mv ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-name }}.tmp ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-name }}"
+
+    # Make sure PHP is available
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ inputs.php-version }}
+
+    # Run build hook
+    - name: Run build hook
+      shell: bash
+      run: ${{ inputs.build }}
+
+    # Run deployer
+    - name: Deploy
+      uses: deployphp/action@v1
+      with:
+        dep:
+          deploy -o remote_user=${{ steps.hosting.outputs.ssh-user }} -o
+          hostname=${{ steps.hosting.outputs.ssh-host }} -o port=${{
+          steps.hosting.outputs.ssh-port }} -o http_user=${{
+          steps.hosting.outputs.http-user }} -o deploy_path=${{
+          steps.hosting.outputs.deploy-path }} -o bin/php=php-${{
+          inputs.php-version }} -o web_url=${{ steps.hosting.outputs.public-url
+          }}
+        private-key: ${{ inputs.ssh-private-key }}
