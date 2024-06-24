@@ -46908,7 +46908,6 @@ async function findOrCreateWebspace(webspaceName, app) {
             core.info(`Using webspace ${webspaceName} (${webspace.id})`);
         }
         else {
-            core.info(JSON.stringify(webspace.cronJobs));
             core.info(`Updating webspace ${webspaceName} (${webspace.id})`);
             webspace = await client.updateWebspace(webspace, phpv, app.cron, redisEnabled);
         }
