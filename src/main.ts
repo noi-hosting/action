@@ -19,12 +19,15 @@ export async function run(): Promise<void> {
     })
     const webspaceName: string = `${projectPrefix}-${ref}-${appKey}`.trim()
     const databasePrefix: string = `${projectPrefix}-${ref}`.trim()
-    const { manifest, app, envVars } = await config(appKey)
+    const { manifest, app, envVars: env1 } = await config(appKey)
 
-    const { webspace, sshHost, sshUser, httpUser } = await services.getWebspace(
-      webspaceName,
-      app
-    )
+    const {
+      webspace,
+      sshHost,
+      sshUser,
+      httpUser,
+      envVars: env2
+    } = await services.getWebspace(webspaceName, app)
 
     const { destinations } = await services.applyVhosts(
       webspace,
@@ -34,7 +37,7 @@ export async function run(): Promise<void> {
       appKey,
       httpUser
     )
-    const { envVars: dbEnvVars } = await services.applyDatabases(
+    const { envVars: env3 } = await services.applyDatabases(
       databasePrefix,
       appKey,
       app,
@@ -45,7 +48,7 @@ export async function run(): Promise<void> {
     core.setOutput('ssh-host', sshHost)
     core.setOutput('ssh-port', 2244)
     core.setOutput('http-user', httpUser)
-    core.setOutput('env-vars', Object.assign(envVars, dbEnvVars))
+    core.setOutput('env-vars', Object.assign(env1, env2, env3))
     core.setOutput('deploy-path', destinations[0].deployPath)
     core.setOutput('public-url', destinations[0].publicUrl)
 

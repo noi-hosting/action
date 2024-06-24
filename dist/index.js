@@ -46798,15 +46798,15 @@ async function run() {
         });
         const webspaceName = `${projectPrefix}-${ref}-${appKey}`.trim();
         const databasePrefix = `${projectPrefix}-${ref}`.trim();
-        const { manifest, app, envVars } = await (0, config_1.config)(appKey);
-        const { webspace, sshHost, sshUser, httpUser } = await services.getWebspace(webspaceName, app);
+        const { manifest, app, envVars: env1 } = await (0, config_1.config)(appKey);
+        const { webspace, sshHost, sshUser, httpUser, envVars: env2 } = await services.getWebspace(webspaceName, app);
         const { destinations } = await services.applyVhosts(webspace, app, manifest, ref, appKey, httpUser);
-        const { envVars: dbEnvVars } = await services.applyDatabases(databasePrefix, appKey, app, manifest);
+        const { envVars: env3 } = await services.applyDatabases(databasePrefix, appKey, app, manifest);
         core.setOutput('ssh-user', sshUser);
         core.setOutput('ssh-host', sshHost);
         core.setOutput('ssh-port', 2244);
         core.setOutput('http-user', httpUser);
-        core.setOutput('env-vars', Object.assign(envVars, dbEnvVars));
+        core.setOutput('env-vars', Object.assign(env1, env2, env3));
         core.setOutput('deploy-path', destinations[0].deployPath);
         core.setOutput('public-url', destinations[0].publicUrl);
         if (manifest.project?.prune ?? true) {
@@ -46869,7 +46869,12 @@ async function getWebspace(webspaceName, app) {
         webspace,
         sshUser: webspaceAccess.userName,
         sshHost: webspace.hostName,
-        httpUser: webspace.webspaceName
+        httpUser: webspace.webspaceName,
+        envVars: {
+            REDIS_URL: webspace.redisEnabled
+                ? `redis:///run/redis-${webspace.webspaceName}/sock`
+                : ''
+        }
     };
 }
 exports.getWebspace = getWebspace;

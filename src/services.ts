@@ -20,6 +20,7 @@ export async function getWebspace(
   sshUser: string
   sshHost: string
   httpUser: string
+  envVars: { [key: string]: string | boolean | number }
 }> {
   const webspace = await findOrCreateWebspace(webspaceName, app)
   const webspaceAccess = await getWebspaceAccess(webspace)
@@ -28,7 +29,12 @@ export async function getWebspace(
     webspace,
     sshUser: webspaceAccess.userName,
     sshHost: webspace.hostName,
-    httpUser: webspace.webspaceName
+    httpUser: webspace.webspaceName,
+    envVars: {
+      REDIS_URL: webspace.redisEnabled
+        ? `redis:///run/redis-${webspace.webspaceName}/sock`
+        : ''
+    }
   }
 }
 
