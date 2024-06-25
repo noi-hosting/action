@@ -271,12 +271,25 @@ export async function configureDatabases(
     } else {
       core.info(`Creating database ${databaseInternalName}`)
 
-      const { database, databaseUserName, databasePassword } =
-        await client.createDatabase(
-          dbUserName,
-          databaseInternalName,
-          app.pool ?? null
-        )
+      const {
+        database: createdDatabase,
+        databaseUserName,
+        databasePassword
+      } = await client.createDatabase(
+        dbUserName,
+        databaseInternalName,
+        app.pool ?? null
+      )
+
+      let database: DatabaseResult | null = createdDatabase
+      do {
+        await wait(2000)
+        core.info(`Waiting for database ${databaseInternalName} to come up...`)
+        database = await client.findDatabaseById(database.id)
+        if (null === database) {
+          throw new Error(`Unexpected error.`)
+        }
+      } while ('active' !== database.status)
 
       newDatabases.push(databaseName)
 

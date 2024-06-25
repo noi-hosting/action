@@ -171,27 +171,23 @@ export async function findDatabases(
       }
     })
 
-  core.info(
-    JSON.stringify({
+  return response.result?.response?.data ?? []
+}
+
+export async function findDatabaseById(
+  databaseId: string
+): Promise<DatabaseResult | null> {
+  const response: TypedResponse<ApiFindResponse<DatabaseResult>> =
+    await _http.postJson(`${baseUri}/database/v1/json/databasesFind`, {
       authToken: token,
+      limit: 1,
       filter: {
-        subFilterConnective: 'AND',
-        subFilter: [
-          {
-            subFilterConnective: 'OR',
-            subFilter: filter
-          },
-          {
-            field: 'databaseStatus',
-            value: 'active'
-          }
-        ]
+        field: 'databaseId',
+        value: databaseId
       }
     })
-  )
-  core.info(JSON.stringify(response.result))
 
-  return response.result?.response?.data ?? []
+  return response.result?.response?.data[0] ?? null
 }
 
 export async function findDatabaseAccesses(

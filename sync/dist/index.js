@@ -30287,7 +30287,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.transformCronJob = exports.createDatabaseUser = exports.createWebspaceUser = exports.addDatabaseAccess = exports.createDatabase = exports.createVhost = exports.updateWebspace = exports.createWebspace = exports.findWebspaceUsers = exports.findDatabaseAccesses = exports.findDatabases = exports.deleteDatabaseUserById = exports.truncateDatabaseById = exports.deleteDatabaseById = exports.deleteVhostById = exports.deleteWebspaceById = exports.findVhostByWebspace = exports.findWebspaceById = exports.findOneWebspaceByName = exports.findActiveWebspaces = void 0;
+exports.transformCronJob = exports.createDatabaseUser = exports.createWebspaceUser = exports.addDatabaseAccess = exports.createDatabase = exports.createVhost = exports.updateWebspace = exports.createWebspace = exports.findWebspaceUsers = exports.findDatabaseAccesses = exports.findDatabaseById = exports.findDatabases = exports.deleteDatabaseUserById = exports.truncateDatabaseById = exports.deleteDatabaseById = exports.deleteVhostById = exports.deleteWebspaceById = exports.findVhostByWebspace = exports.findWebspaceById = exports.findOneWebspaceByName = exports.findActiveWebspaces = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
 const http_client_1 = __nccwpck_require__(6255);
@@ -30433,26 +30433,21 @@ async function findDatabases(databaseNames) {
             ]
         }
     });
-    core.info(JSON.stringify({
-        authToken: token,
-        filter: {
-            subFilterConnective: 'AND',
-            subFilter: [
-                {
-                    subFilterConnective: 'OR',
-                    subFilter: filter
-                },
-                {
-                    field: 'databaseStatus',
-                    value: 'active'
-                }
-            ]
-        }
-    }));
-    core.info(JSON.stringify(response.result));
     return response.result?.response?.data ?? [];
 }
 exports.findDatabases = findDatabases;
+async function findDatabaseById(databaseId) {
+    const response = await _http.postJson(`${baseUri}/database/v1/json/databasesFind`, {
+        authToken: token,
+        limit: 1,
+        filter: {
+            field: 'databaseId',
+            value: databaseId
+        }
+    });
+    return response.result?.response?.data[0] ?? null;
+}
+exports.findDatabaseById = findDatabaseById;
 async function findDatabaseAccesses(userName, databaseId) {
     const response = await _http.postJson(`${baseUri}/database/v1/json/usersFind`, {
         authToken: token,
