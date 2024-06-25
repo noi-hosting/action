@@ -30825,12 +30825,10 @@ async function run() {
         const projectPrefix = core.getInput('project-prefix', {
             required: true
         });
-        //const shallSyncFiles: boolean = !!core.getInput('sync-files')
-        const shallSyncDatabases = 'false' !== core.getInput('sync-databases');
+        //const shallSyncFiles: boolean = !!core.getInput('files')
+        const shallSyncDatabases = 'false' !== core.getInput('databases');
         core.info(shallSyncDatabases ? 'true' : 'false');
-        const syncDatabases = core
-            .getInput('sync-databases')
-            .split(' ');
+        const syncDatabases = core.getInput('databases').split(' ');
         core.info(JSON.stringify(syncDatabases));
         const { manifest, app } = await (0, config_1.config)(appKey);
         let fromEnv = core.getInput('from', { required: false });

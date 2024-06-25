@@ -17,13 +17,10 @@ export async function run(): Promise<void> {
     const projectPrefix: string = core.getInput('project-prefix', {
       required: true
     })
-    //const shallSyncFiles: boolean = !!core.getInput('sync-files')
-    const shallSyncDatabases: boolean =
-      'false' !== core.getInput('sync-databases')
+    //const shallSyncFiles: boolean = !!core.getInput('files')
+    const shallSyncDatabases: boolean = 'false' !== core.getInput('databases')
     core.info(shallSyncDatabases ? 'true' : 'false')
-    const syncDatabases: string[] | false = core
-      .getInput('sync-databases')
-      .split(' ')
+    const syncDatabases: string[] = core.getInput('databases').split(' ')
     core.info(JSON.stringify(syncDatabases))
 
     const { manifest, app } = await config(appKey)
