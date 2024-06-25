@@ -30924,8 +30924,8 @@ async function run() {
             }
             core.info(`Database "${migration.to.humanName}" will be overridden using database "${migration.from.humanName}"`);
             const filename = `${crypto_1.default.randomUUID()}.sql`;
-            await (0, exec_1.exec)(`mysqldump -h ${migration.from.host} -u ${migration.from.user} --password=${migration.from.password} ${migration.from.name} > ${filename}`);
-            await (0, exec_1.exec)(`mysql -h ${migration.to.host} -u ${migration.to.user} --password=${migration.to.password} ${migration.to.name} < ${filename}`);
+            await (0, exec_1.exec)(`mysqldump -h ${migration.from.host} -u ${migration.from.user} -p${migration.from.password} "${migration.from.name}" > ${filename}`);
+            await (0, exec_1.exec)(`mysql -h ${migration.to.host} -u ${migration.to.user} -p${migration.to.password} "${migration.to.name}" < ${filename}`);
         }
         await client.deleteDatabaseUserById(dbUser.id);
     }
