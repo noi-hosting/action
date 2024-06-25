@@ -10,7 +10,7 @@ export async function config(appKey: string): Promise<{
     fs.readFileSync('./.hosting/config.yaml', 'utf8')
   ) as Manifest
   const app = manifest.applications[appKey] ?? null
-  const envVars = app.env ?? {}
+  const envVars = app?.env ?? {}
 
   return { manifest, app, envVars }
 }

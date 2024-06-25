@@ -91,7 +91,9 @@ runs:
         ssh-private-key: ${{ inputs.ssh-private-key }}
         to: ${{ github.ref_name }}
         files: ${{ steps.outputs.hosting.sync-files }}
-        databases: ${{ steps.outputs.hosting.sync-databases || 'false' }}
+        databases:
+          ${{ steps.outputs.hosting.sync-databases &&
+          steps.outputs.hosting.sync-databases || 'false' }}
 
     # We need jq for json processing
     - name: Install jq

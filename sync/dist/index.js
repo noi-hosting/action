@@ -30767,7 +30767,7 @@ const fs_1 = __importDefault(__nccwpck_require__(7147));
 async function config(appKey) {
     const manifest = yaml.load(fs_1.default.readFileSync('./.hosting/config.yaml', 'utf8'));
     const app = manifest.applications[appKey] ?? null;
-    const envVars = app.env ?? {};
+    const envVars = app?.env ?? {};
     return { manifest, app, envVars };
 }
 exports.config = config;
