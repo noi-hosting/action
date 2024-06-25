@@ -46814,9 +46814,11 @@ async function run() {
         if (null === app) {
             throw new Error(`Cannot find "applications.${appKey}" in the ".hosting/config.yaml" manifest.`);
         }
-        const { webspace, sshHost, sshUser, httpUser, envVars: env2 } = await services.getWebspace(webspaceName, app);
+        const { webspace, isNew: isNewWebspace, sshHost, sshUser, httpUser, envVars: env2 } = await services.getWebspace(webspaceName, app);
         const { destinations } = await services.applyVhosts(webspace, app, manifest, ref, appKey, httpUser);
-        const { envVars: env3 } = await services.applyDatabases(databasePrefix, appKey, app, manifest);
+        const { newDatabases, envVars: env3 } = await services.applyDatabases(databasePrefix, appKey, app, manifest);
+        core.setOutput('sync-files', isNewWebspace);
+        core.setOutput('sync-databases', newDatabases.join(' '));
         core.setOutput('ssh-user', sshUser);
         core.setOutput('ssh-host', sshHost);
         core.setOutput('ssh-port', 2244);
@@ -46878,10 +46880,11 @@ const wait_1 = __nccwpck_require__(5259);
 const _ = __importStar(__nccwpck_require__(250));
 const api_client_1 = __nccwpck_require__(5707);
 async function getWebspace(webspaceName, app) {
-    const webspace = await findOrCreateWebspace(webspaceName, app);
+    const { webspace, isNew } = await findOrCreateWebspace(webspaceName, app);
     const webspaceAccess = await getWebspaceAccess(webspace);
     return {
         webspace,
+        isNew,
         sshUser: webspaceAccess.userName,
         sshHost: webspace.hostName,
         httpUser: webspace.webspaceName,
@@ -46910,9 +46913,9 @@ exports.applyVhosts = applyVhosts;
 async function applyDatabases(databasePrefix, appKey, app, manifest) {
     const envVars = {};
     const foundDatabases = await client.findDatabases(`${databasePrefix}-*`);
-    await configureDatabases(app, databasePrefix, appKey, foundDatabases, envVars);
+    const { newDatabases } = await configureDatabases(app, databasePrefix, appKey, foundDatabases, envVars);
     await pruneDatabases(manifest, databasePrefix, foundDatabases);
-    return { envVars };
+    return { newDatabases, envVars };
 }
 exports.applyDatabases = applyDatabases;
 async function findOrCreateWebspace(webspaceName, app) {
@@ -46922,7 +46925,6 @@ async function findOrCreateWebspace(webspaceName, app) {
         app.php.ini['extension=redis.so']);
     let webspace = await client.findOneWebspaceByName(webspaceName);
     if (null !== webspace) {
-        core.setOutput('shall-sync', false);
         if (_.isEqual(webspace.cronJobs, app.cron.map(c => (0, api_client_1.transformCronJob)(c, phpv))) &&
             redisEnabled === (webspace.redisEnabled ?? false)) {
             core.info(`Using webspace ${webspaceName} (${webspace.id})`);
@@ -46931,10 +46933,9 @@ async function findOrCreateWebspace(webspaceName, app) {
             core.info(`Updating webspace ${webspaceName} (${webspace.id})`);
             webspace = await client.updateWebspace(webspace, phpv, app.cron, redisEnabled);
         }
-        return webspace;
+        return { webspace, isNew: false };
     }
     core.info('Creating a new webspace...');
-    core.setOutput('shall-sync', true);
     webspace = await client.createWebspace(webspaceName, app.cron, phpv, app.pool ?? null, app.account ?? null, redisEnabled);
     do {
         await (0, wait_1.wait)(2000);
@@ -46944,7 +46945,7 @@ async function findOrCreateWebspace(webspaceName, app) {
             throw new Error(`Unexpected error.`);
         }
     } while ('active' !== webspace.status);
-    return webspace;
+    return { webspace, isNew: true };
 }
 exports.findOrCreateWebspace = findOrCreateWebspace;
 async function getWebspaceAccess(webspace) {
@@ -46981,6 +46982,7 @@ async function pruneVhosts(foundVhosts, app, ref, manifest, appKey) {
 }
 exports.pruneVhosts = pruneVhosts;
 async function configureDatabases(app, databasePrefix, appKey, foundDatabases, envVars) {
+    const newDatabases = [];
     for (const [relationName, databaseName] of Object.entries(app.databases ?? {})) {
         const databaseInternalName = `${databasePrefix}-${databaseName.toLowerCase()}`;
         const dbUserName = `${databasePrefix}-${appKey}--${relationName.toLowerCase()}`;
@@ -47001,9 +47003,11 @@ async function configureDatabases(app, databasePrefix, appKey, foundDatabases, e
         else {
             core.info(`Creating database ${databaseInternalName}`);
             const { database, databaseUserName, databasePassword } = await client.createDatabase(dbUserName, databaseInternalName, app.pool ?? null);
+            newDatabases.push(relationName);
             defineEnv(envVars, relationName, database, databaseUserName, databasePassword);
         }
     }
+    return { newDatabases };
 }
 exports.configureDatabases = configureDatabases;
 function defineEnv(envVars, relationName, database, databaseUserName, databasePassword) {

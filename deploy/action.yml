@@ -81,11 +81,14 @@ runs:
 
     # Sync app
     - name: Sync environments
-      if: ${{ steps.outputs.hosting.shall-sync }}
+      if:
+        ${{ steps.outputs.hosting.sync-files ||
+        steps.outputs.hosting.sync-databases }}
       uses: richardhj/setup-hostingde/sync@main
       with:
         to: ${{ github.ref_name }}
-        app: ${{ inputs.app }}
+        files: ${{ steps.outputs.hosting.sync-files }}
+        databases: ${{ steps.outputs.hosting.sync-databases || 'false' }}
 
     # We need jq for json processing
     - name: Install jq

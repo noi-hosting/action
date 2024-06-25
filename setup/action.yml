@@ -36,10 +36,14 @@ outputs:
     description: The URL under that the deployment will be reachable.
   env-vars:
     description: Environment variables to set on the host (json encoded).
-  shall-sync:
+  sync-files:
     description:
-      This is a newly created environment that shall by synced from the parent
-      environment.
+      This is true when this is a newly created webspace that files shall be
+      synced from the parent environment.
+  sync-databases:
+    description:
+      A whitespace separated list of databases that are newly created and shall
+      be synced from the parent environment.
 
 runs:
   using: node20

@@ -28,6 +28,7 @@ export async function run(): Promise<void> {
 
     const {
       webspace,
+      isNew: isNewWebspace,
       sshHost,
       sshUser,
       httpUser,
@@ -42,13 +43,15 @@ export async function run(): Promise<void> {
       appKey,
       httpUser
     )
-    const { envVars: env3 } = await services.applyDatabases(
+    const { newDatabases, envVars: env3 } = await services.applyDatabases(
       databasePrefix,
       appKey,
       app,
       manifest
     )
 
+    core.setOutput('sync-files', isNewWebspace)
+    core.setOutput('sync-databases', newDatabases.join(' '))
     core.setOutput('ssh-user', sshUser)
     core.setOutput('ssh-host', sshHost)
     core.setOutput('ssh-port', 2244)

@@ -30825,6 +30825,11 @@ async function run() {
         const projectPrefix = core.getInput('project-prefix', {
             required: true
         });
+        //const shallSyncFiles: boolean = !!core.getInput('sync-files')
+        const shallSyncDatabases = 'false' !== core.getInput('sync-databases');
+        const syncDatabases = core
+            .getInput('sync-databases')
+            .split(' ');
         const { manifest, app } = await (0, config_1.config)(appKey);
         let fromEnv = core.getInput('from', { required: false });
         const toEnv = core.getInput('to', { required: true });
@@ -30834,14 +30839,25 @@ async function run() {
         if ('' === fromEnv || '' === toEnv) {
             core.info('Sync destinations were not specified and cannot be derived. Please check the `project.parent` config in your manifest file.');
         }
+        if (!shallSyncDatabases) {
+            return;
+        }
         core.info(`Syncing databases from environment "${fromEnv}" to environment "${toEnv}"`);
         const dbQueries = [];
         if ('' === appKey) {
-            dbQueries.push(`${projectPrefix}-${fromEnv}-*`);
-            dbQueries.push(`${projectPrefix}-${toEnv}-*`);
+            if (syncDatabases.length > 0) {
+                for (const dbName of syncDatabases) {
+                    dbQueries.push(`${projectPrefix}-${fromEnv}-${dbName}`);
+                    dbQueries.push(`${projectPrefix}-${toEnv}-${dbName}`);
+                }
+            }
+            else {
+                dbQueries.push(`${projectPrefix}-${fromEnv}-*`);
+                dbQueries.push(`${projectPrefix}-${toEnv}-*`);
+            }
         }
         else if (null !== app) {
-            for (const relationName of Object.values(app.databases ?? {})) {
+            for (const relationName of Object.values(app.databases ?? {}).filter(d => d.length === 0 || syncDatabases.includes(d))) {
                 dbQueries.push(`${projectPrefix}-${fromEnv}-${relationName}`);
                 dbQueries.push(`${projectPrefix}-${toEnv}-${relationName}`);
             }

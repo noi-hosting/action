@@ -17,16 +17,18 @@ export async function getWebspace(
   app: ManifestApp
 ): Promise<{
   webspace: WebspaceResult
+  isNew: boolean
   sshUser: string
   sshHost: string
   httpUser: string
   envVars: { [key: string]: string | boolean | number }
 }> {
-  const webspace = await findOrCreateWebspace(webspaceName, app)
+  const { webspace, isNew } = await findOrCreateWebspace(webspaceName, app)
   const webspaceAccess = await getWebspaceAccess(webspace)
 
   return {
     webspace,
+    isNew,
     sshUser: webspaceAccess.userName,
     sshHost: webspace.hostName,
     httpUser: webspace.webspaceName,
@@ -80,20 +82,29 @@ export async function applyDatabases(
   appKey: string,
   app: ManifestApp,
   manifest: Manifest
-): Promise<{ envVars: { [key: string]: string | boolean | number } }> {
+): Promise<{
+  newDatabases: string[]
+  envVars: { [key: string]: string | boolean | number }
+}> {
   const envVars = {}
   const foundDatabases = await client.findDatabases(`${databasePrefix}-*`)
 
-  await configureDatabases(app, databasePrefix, appKey, foundDatabases, envVars)
+  const { newDatabases } = await configureDatabases(
+    app,
+    databasePrefix,
+    appKey,
+    foundDatabases,
+    envVars
+  )
   await pruneDatabases(manifest, databasePrefix, foundDatabases)
 
-  return { envVars }
+  return { newDatabases, envVars }
 }
 
 export async function findOrCreateWebspace(
   webspaceName: string,
   app: ManifestApp
-): Promise<WebspaceResult> {
+): Promise<{ webspace: WebspaceResult; isNew: boolean }> {
   const phpv = app.php?.version ?? process.env.PHP_VERSION ?? null
   const redisEnabled = !!(
     app.php?.ini !== undefined &&
@@ -104,8 +115,6 @@ export async function findOrCreateWebspace(
     await client.findOneWebspaceByName(webspaceName)
 
   if (null !== webspace) {
-    core.setOutput('shall-sync', false)
-
     if (
       _.isEqual(
         webspace.cronJobs,
@@ -125,11 +134,10 @@ export async function findOrCreateWebspace(
       )
     }
 
-    return webspace
+    return { webspace, isNew: false }
   }
 
   core.info('Creating a new webspace...')
-  core.setOutput('shall-sync', true)
 
   webspace = await client.createWebspace(
     webspaceName,
@@ -151,7 +159,7 @@ export async function findOrCreateWebspace(
     }
   } while ('active' !== webspace.status)
 
-  return webspace
+  return { webspace, isNew: true }
 }
 
 export async function getWebspaceAccess(
@@ -227,7 +235,8 @@ export async function configureDatabases(
   appKey: string,
   foundDatabases: DatabaseResult[],
   envVars: object
-): Promise<void> {
+): Promise<{ newDatabases: string[] }> {
+  const newDatabases = []
   for (const [relationName, databaseName] of Object.entries(
     app.databases ?? {}
   )) {
@@ -269,6 +278,8 @@ export async function configureDatabases(
           app.pool ?? null
         )
 
+      newDatabases.push(relationName)
+
       defineEnv(
         envVars,
         relationName,
@@ -278,6 +289,8 @@ export async function configureDatabases(
       )
     }
   }
+
+  return { newDatabases }
 }
 
 function defineEnv(

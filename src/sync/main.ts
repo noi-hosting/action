@@ -17,6 +17,13 @@ export async function run(): Promise<void> {
     const projectPrefix: string = core.getInput('project-prefix', {
       required: true
     })
+    //const shallSyncFiles: boolean = !!core.getInput('sync-files')
+    const shallSyncDatabases: boolean =
+      'false' !== core.getInput('sync-databases')
+    const syncDatabases: string[] | false = core
+      .getInput('sync-databases')
+      .split(' ')
+
     const { manifest, app } = await config(appKey)
 
     let fromEnv = core.getInput('from', { required: false })
@@ -31,16 +38,29 @@ export async function run(): Promise<void> {
       )
     }
 
+    if (!shallSyncDatabases) {
+      return
+    }
+
     core.info(
       `Syncing databases from environment "${fromEnv}" to environment "${toEnv}"`
     )
 
     const dbQueries: string[] = []
     if ('' === appKey) {
-      dbQueries.push(`${projectPrefix}-${fromEnv}-*`)
-      dbQueries.push(`${projectPrefix}-${toEnv}-*`)
+      if (syncDatabases.length > 0) {
+        for (const dbName of syncDatabases) {
+          dbQueries.push(`${projectPrefix}-${fromEnv}-${dbName}`)
+          dbQueries.push(`${projectPrefix}-${toEnv}-${dbName}`)
+        }
+      } else {
+        dbQueries.push(`${projectPrefix}-${fromEnv}-*`)
+        dbQueries.push(`${projectPrefix}-${toEnv}-*`)
+      }
     } else if (null !== app) {
-      for (const relationName of Object.values(app.databases ?? {})) {
+      for (const relationName of Object.values(app.databases ?? {}).filter(
+        d => d.length === 0 || syncDatabases.includes(d)
+      )) {
         dbQueries.push(`${projectPrefix}-${fromEnv}-${relationName}`)
         dbQueries.push(`${projectPrefix}-${toEnv}-${relationName}`)
       }

@@ -16,6 +16,14 @@ inputs:
   app:
     description: Limit sync to one app.
     default: ''
+  files:
+    description: You can disable sync of files.
+    default: 'true'
+  databases:
+    description:
+      You can limit sync of databases to given. "False" will disable sync of
+      databases.
+    default: ''
   project-prefix:
     description:
       A prefix used to identify resources on Hosting.de. Must be kept unique
