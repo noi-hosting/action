@@ -19,9 +19,7 @@ export async function run(): Promise<void> {
     })
     //const shallSyncFiles: boolean = !!core.getInput('files')
     const shallSyncDatabases: boolean = 'false' !== core.getInput('databases')
-    core.info(shallSyncDatabases ? 'true' : 'false')
     const syncDatabases: string[] = core.getInput('databases').split(' ')
-    core.info(JSON.stringify(syncDatabases))
 
     const { manifest, app } = await config(appKey)
 
@@ -69,12 +67,14 @@ export async function run(): Promise<void> {
       )
     }
 
+    core.info(JSON.stringify(dbQueries))
+
     if (!dbQueries.length) {
       return
     }
 
     const migrations: {
-      [relationName: string]: {
+      [name: string]: {
         [direction: string]: {
           host: string
           user: string
@@ -94,7 +94,7 @@ export async function run(): Promise<void> {
       const { dbLogin } = await client.addDatabaseAccess(db, dbUser)
       const dbHost = db.hostName
       const dbEnv = db.name.split('-')[1] ?? null
-      const dbRelationName = db.name.split('-')[2] ?? null
+      const dbName = db.name.split('-')[2] ?? null
 
       let k
       if (dbEnv === fromEnv) {
@@ -105,7 +105,7 @@ export async function run(): Promise<void> {
         throw new Error(`Unexpected database environment "${dbEnv}"`)
       }
 
-      migrations[dbRelationName][k] = {
+      migrations[dbName][k] = {
         host: dbHost,
         user: dbLogin,
         password: dbPassword,
@@ -114,7 +114,9 @@ export async function run(): Promise<void> {
       }
     }
 
+    core.info(JSON.stringify(migrations))
     for (const migration of Object.values(migrations)) {
+      core.info(JSON.stringify(migration))
       if (!('from' in migration)) {
         core.info(
           `Found database "${migration.to.humanName}" but this database is not present in the "${fromEnv}" environment`

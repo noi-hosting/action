@@ -30834,9 +30834,7 @@ async function run() {
         });
         //const shallSyncFiles: boolean = !!core.getInput('files')
         const shallSyncDatabases = 'false' !== core.getInput('databases');
-        core.info(shallSyncDatabases ? 'true' : 'false');
         const syncDatabases = core.getInput('databases').split(' ');
-        core.info(JSON.stringify(syncDatabases));
         const { manifest, app } = await (0, config_1.config)(appKey);
         let fromEnv = core.getInput('from', { required: false });
         const toEnv = core.getInput('to', { required: true });
@@ -30872,6 +30870,7 @@ async function run() {
         else {
             throw new Error(`Cannot find "applications.${appKey}" in the ".hosting/config.yaml" manifest.`);
         }
+        core.info(JSON.stringify(dbQueries));
         if (!dbQueries.length) {
             return;
         }
@@ -30883,7 +30882,7 @@ async function run() {
             const { dbLogin } = await client.addDatabaseAccess(db, dbUser);
             const dbHost = db.hostName;
             const dbEnv = db.name.split('-')[1] ?? null;
-            const dbRelationName = db.name.split('-')[2] ?? null;
+            const dbName = db.name.split('-')[2] ?? null;
             let k;
             if (dbEnv === fromEnv) {
                 k = 'from';
@@ -30894,7 +30893,7 @@ async function run() {
             else {
                 throw new Error(`Unexpected database environment "${dbEnv}"`);
             }
-            migrations[dbRelationName][k] = {
+            migrations[dbName][k] = {
                 host: dbHost,
                 user: dbLogin,
                 password: dbPassword,
@@ -30902,7 +30901,9 @@ async function run() {
                 humanName: db.name
             };
         }
+        core.info(JSON.stringify(migrations));
         for (const migration of Object.values(migrations)) {
+            core.info(JSON.stringify(migration));
             if (!('from' in migration)) {
                 core.info(`Found database "${migration.to.humanName}" but this database is not present in the "${fromEnv}" environment`);
                 continue;
