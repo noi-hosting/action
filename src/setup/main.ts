@@ -35,14 +35,8 @@ export async function run(): Promise<void> {
       envVars: env2
     } = await services.getWebspace(webspaceName, app)
 
-    const { destinations } = await services.applyVhosts(
-      webspace,
-      app,
-      manifest,
-      ref,
-      appKey,
-      httpUser
-    )
+    const { destinations, phpVersion, phpExtensions } =
+      await services.applyVhosts(webspace, app, manifest, ref, appKey, httpUser)
     const { newDatabases, envVars: env3 } = await services.applyDatabases(
       databasePrefix,
       appKey,
@@ -56,6 +50,8 @@ export async function run(): Promise<void> {
     core.setOutput('ssh-host', sshHost)
     core.setOutput('ssh-port', 2244)
     core.setOutput('http-user', httpUser)
+    core.setOutput('php-version', phpVersion)
+    core.setOutput('php-extensions', phpExtensions.join(', '))
     core.setOutput('env-vars', Object.assign(env1, env2, env3))
     core.setOutput('deploy-path', destinations[0].deployPath)
     core.setOutput('public-url', destinations[0].publicUrl)

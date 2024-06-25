@@ -17,9 +17,9 @@ export async function run(): Promise<void> {
     const projectPrefix: string = core.getInput('project-prefix', {
       required: true
     })
-    //const shallSyncFiles: boolean = !!core.getInput('files')
+    const shallSyncFiles: boolean = 'false' !== core.getInput('files')
     const shallSyncDatabases: boolean = 'false' !== core.getInput('databases')
-    const syncDatabases: string[] = core.getInput('databases').split(' ')
+    const syncDatabases: string[] = core.getInput('only-databases').split(' ')
 
     const { manifest, app } = await config(appKey)
 
@@ -33,6 +33,41 @@ export async function run(): Promise<void> {
       core.info(
         'Sync destinations were not specified and cannot be derived. Please check the `project.parent` config in your manifest file.'
       )
+    }
+
+    if (shallSyncFiles) {
+      for (const [appName, app1] of Object.entries(manifest.applications)) {
+        if ('' !== appKey && appName !== appKey) {
+          continue
+        }
+
+        const fromWebspace = await client.findOneWebspaceByName(
+          `${projectPrefix}-${fromEnv}-${appName}`
+        )
+        const toWebspace = await client.findOneWebspaceByName(
+          `${projectPrefix}-${toEnv}-${appName}`
+        )
+        if (null === fromWebspace) {
+          core.info(
+            `The webspace for app ${appName} is not present in the ${fromEnv} environment. Skipping.`
+          )
+          continue
+        }
+        if (null === toWebspace) {
+          continue
+        }
+
+        const dirs = Object.values(app1.sync ?? {})
+        for (let dir of dirs) {
+          dir = dir.trim().replace(/\/$/, '').replace(/^\//, '')
+          const pathFrom = `/home/${fromWebspace.webspaceName}/html/current/${dir}`
+          const pathTo = `/home/${toWebspace.webspaceName}/html/current/${dir}`
+
+          await exec(
+            `/bin/bash -c "ssh -p 2244 -R localhost:50000:${toWebspace.hostName}:2244 ${fromWebspace.hostName} 'rsync -e "ssh -p 50000" -azr --delete ${pathFrom} localhost:${pathTo}'"`
+          )
+        }
+      }
     }
 
     if (!shallSyncDatabases) {

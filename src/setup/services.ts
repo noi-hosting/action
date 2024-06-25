@@ -47,12 +47,18 @@ export async function applyVhosts(
   ref: string,
   appKey: string,
   httpUser: string
-): Promise<{ destinations: Destination[] }> {
+): Promise<{
+  destinations: Destination[]
+  phpVersion: string
+  phpExtensions: string[]
+}> {
   const foundVhosts: VhostResult[] = await client.findVhostByWebspace(
     webspace.id
   )
 
   const destinations = []
+  const phpVersion = app.php.version
+  const phpExtensions = app.php.extensions ?? []
 
   for (const [domainKey, web] of Object.entries(app.web)) {
     const { domainName } = await configureVhosts(
@@ -63,7 +69,8 @@ export async function applyVhosts(
       manifest,
       appKey,
       foundVhosts,
-      webspace
+      webspace,
+      phpVersion
     )
 
     destinations.push({
@@ -74,7 +81,7 @@ export async function applyVhosts(
 
   await pruneVhosts(foundVhosts, app, ref, manifest, appKey)
 
-  return { destinations }
+  return { destinations, phpVersion, phpExtensions }
 }
 
 export async function applyDatabases(
@@ -106,11 +113,8 @@ export async function findOrCreateWebspace(
   app: ManifestApp
 ): Promise<{ webspace: WebspaceResult; isNew: boolean }> {
   const phpv = app.php?.version ?? process.env.PHP_VERSION ?? null
-  const redisEnabled = !!(
-    app.php?.ini !== undefined &&
-    'extension=redis.so' in app.php.ini &&
-    app.php.ini['extension=redis.so']
-  )
+  const redisEnabled =
+    app.php?.extensions !== undefined && app.php.extensions.includes('redis')
   let webspace: WebspaceResult | null =
     await client.findOneWebspaceByName(webspaceName)
 
@@ -118,9 +122,10 @@ export async function findOrCreateWebspace(
     if (
       _.isEqual(
         webspace.cronJobs,
-        app.cron.map(c => transformCronJob(c, phpv))
+        (app.cron ?? []).map(c => transformCronJob(c, phpv))
       ) &&
-      redisEnabled === (webspace.redisEnabled ?? false)
+      redisEnabled === (webspace.redisEnabled ?? false) &&
+      webspace.storageQuota === (app.disk ?? 10240)
     ) {
       core.info(`Using webspace ${webspaceName} (${webspace.id})`)
     } else {
@@ -130,7 +135,8 @@ export async function findOrCreateWebspace(
         webspace,
         phpv,
         app.cron,
-        redisEnabled
+        redisEnabled,
+        app.disk ?? 10240
       )
     }
 
@@ -141,11 +147,12 @@ export async function findOrCreateWebspace(
 
   webspace = await client.createWebspace(
     webspaceName,
-    app.cron,
+    app.cron ?? [],
     phpv,
     app.pool ?? null,
     app.account ?? null,
-    redisEnabled
+    redisEnabled,
+    app.disk ?? 10240
   )
 
   do {
@@ -187,7 +194,8 @@ export async function configureVhosts(
   manifest: Manifest,
   appKey: string,
   foundVhosts: VhostResult[],
-  webspace: WebspaceResult
+  webspace: WebspaceResult,
+  phpVersion: string
 ): Promise<{ domainName: string }> {
   const actualDomainName = translateDomainName(
     domainName,
@@ -199,7 +207,13 @@ export async function configureVhosts(
   let vhost = foundVhosts.find(v => v.domainName === actualDomainName) ?? null
   if (null === vhost) {
     core.info(`Configuring ${actualDomainName}...`)
-    vhost = await client.createVhost(webspace, web, app, actualDomainName)
+    vhost = await client.createVhost(
+      webspace,
+      web,
+      app,
+      actualDomainName,
+      phpVersion
+    )
   } else if (mustBeUpdated(vhost, app, web)) {
     core.info(`Configuring ${actualDomainName}...`)
     // todo

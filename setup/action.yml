@@ -36,6 +36,10 @@ outputs:
     description: The URL under that the deployment will be reachable.
   env-vars:
     description: Environment variables to set on the host (json encoded).
+  php-version:
+    description: PHP version used for runtime.
+  php-extensions:
+    description: PHP extensions available in runtime.
   sync-files:
     description:
       This is true when this is a newly created webspace that files shall be

@@ -30,8 +30,6 @@ inputs:
   dotenv-name:
     description: Name of the `.env` file.
     default: '.env.local'
-  php-version:
-    description: The php version used for build step.
     required: true
   build:
     description: Shell script for building environment before deployment
@@ -91,7 +89,9 @@ runs:
         ssh-private-key: ${{ inputs.ssh-private-key }}
         to: ${{ github.ref_name }}
         files: ${{ steps.hosting.outputs.sync-files }}
-        databases: ${{ steps.hosting.outputs.sync-databases || 'false' }}
+        databases:
+          ${{ steps.hosting.outputs.sync-databases && 'true' || 'false' }}
+        only-databases: ${{ steps.hosting.outputs.sync-databases }}
 
     # We need jq for json processing
     - name: Install jq
@@ -127,7 +127,8 @@ runs:
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
       with:
-        php-version: ${{ inputs.php-version }}
+        php-version: ${{ steps.hosting.outputs.php-version }}
+        extensions: ${{ steps.hosting.outputs.php-extensions }}
 
     # Run build hook
     - name: Run build hook
@@ -144,6 +145,6 @@ runs:
           steps.hosting.outputs.ssh-port }} -o http_user=${{
           steps.hosting.outputs.http-user }} -o deploy_path=${{
           steps.hosting.outputs.deploy-path }} -o bin/php=php-${{
-          inputs.php-version }} -o web_url=${{ steps.hosting.outputs.public-url
-          }}
+          steps.hosting.outputs.php-version }} -o web_url=${{
+          steps.hosting.outputs.public-url }}
         private-key: ${{ inputs.ssh-private-key }}

@@ -46277,7 +46277,6 @@ exports.transformCronJob = exports.createDatabaseUser = exports.createWebspaceUs
 const core = __importStar(__nccwpck_require__(2186));
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
 const http_client_1 = __nccwpck_require__(6255);
-const node_process_1 = __importDefault(__nccwpck_require__(7742));
 const _http = new http_client_1.HttpClient();
 const token = core.getInput('auth-token', { required: true });
 const baseUri = 'https://secure.hosting.de/api';
@@ -46465,7 +46464,7 @@ async function findWebspaceUsers() {
     return response.result?.response?.data ?? [];
 }
 exports.findWebspaceUsers = findWebspaceUsers;
-async function createWebspace(name, cronjobs, phpVersion, poolId = null, accountId = null, redisEnabled = false) {
+async function createWebspace(name, cronjobs, phpVersion, poolId = null, accountId = null, redisEnabled = false, disk = 10240) {
     const user = await createWebspaceUser(name);
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/webspaceCreate`, {
         poolId,
@@ -46476,7 +46475,8 @@ async function createWebspace(name, cronjobs, phpVersion, poolId = null, account
             comments: 'Created by github action. Please do not change name.',
             productCode: 'webhosting-webspace-v1-1m',
             cronJobs: cronjobs.map(c => transformCronJob(c, phpVersion)),
-            redisEnabled
+            redisEnabled,
+            storageQuota: disk
         },
         accesses: [
             {
@@ -46494,7 +46494,7 @@ async function createWebspace(name, cronjobs, phpVersion, poolId = null, account
     return response.result.response;
 }
 exports.createWebspace = createWebspace;
-async function updateWebspace(originalWebspace, phpVersion, cronjobs = null, redisEnabled = false) {
+async function updateWebspace(originalWebspace, phpVersion, cronjobs = null, redisEnabled = false, disk = 10240) {
     const webspace = originalWebspace;
     const accesses = originalWebspace.accesses;
     if (null !== cronjobs) {
@@ -46503,6 +46503,7 @@ async function updateWebspace(originalWebspace, phpVersion, cronjobs = null, red
     if (null !== redisEnabled) {
         webspace.redisEnabled = redisEnabled;
     }
+    webspace.storageQuota = disk;
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/webspaceUpdate`, {
         authToken: token,
         webspace,
@@ -46517,7 +46518,7 @@ async function updateWebspace(originalWebspace, phpVersion, cronjobs = null, red
     return response.result.response;
 }
 exports.updateWebspace = updateWebspace;
-async function createVhost(webspace, web, app, domainName) {
+async function createVhost(webspace, web, app, domainName, phpVersion) {
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/vhostCreate`, {
         authToken: token,
         vhost: {
@@ -46527,7 +46528,7 @@ async function createVhost(webspace, web, app, domainName) {
             enableAlias: web.www ?? true,
             redirectToPrimaryName: true,
             redirectHttpToHttps: true,
-            phpVersion: app.php?.version ?? node_process_1.default.env.PHP_VERSION ?? null,
+            phpVersion,
             webRoot: `current/${web.root ?? ''}`.replace(/\/$/, ''),
             locations: Object.entries(web.locations ?? {}).map(function ([matchString, location]) {
                 return {
@@ -46550,7 +46551,7 @@ async function createVhost(webspace, web, app, domainName) {
             }
         },
         phpIni: {
-            values: transformPhpIni(app.php?.ini ?? {})
+            values: transformPhpIni(app.php?.ini ?? {}, app.php?.extensions ?? [])
         }
     });
     if (null === response.result) {
@@ -46669,7 +46670,12 @@ async function createDatabaseUser(dbUserName, accountId = null) {
     return { user: response.result.response, password };
 }
 exports.createDatabaseUser = createDatabaseUser;
-function transformPhpIni(ini) {
+function transformPhpIni(ini, extensions) {
+    for (const ext of extensions) {
+        if (['apcu', 'imagick', 'memcached', 'oauth', 'redis'].includes(ext)) {
+            ini[`extension=${ext}.so`] = 'true';
+        }
+    }
     return Object.entries(ini).map(([k, v]) => ({ key: k, value: `${v}` }));
 }
 function transformCronJob(config, phpVersion) {
@@ -46834,7 +46840,7 @@ async function run() {
             throw new Error(`Cannot find "applications.${appKey}" in the ".hosting/config.yaml" manifest.`);
         }
         const { webspace, isNew: isNewWebspace, sshHost, sshUser, httpUser, envVars: env2 } = await services.getWebspace(webspaceName, app);
-        const { destinations } = await services.applyVhosts(webspace, app, manifest, ref, appKey, httpUser);
+        const { destinations, phpVersion, phpExtensions } = await services.applyVhosts(webspace, app, manifest, ref, appKey, httpUser);
         const { newDatabases, envVars: env3 } = await services.applyDatabases(databasePrefix, appKey, app, manifest);
         core.setOutput('sync-files', isNewWebspace);
         core.setOutput('sync-databases', newDatabases.join(' '));
@@ -46842,6 +46848,8 @@ async function run() {
         core.setOutput('ssh-host', sshHost);
         core.setOutput('ssh-port', 2244);
         core.setOutput('http-user', httpUser);
+        core.setOutput('php-version', phpVersion);
+        core.setOutput('php-extensions', phpExtensions.join(', '));
         core.setOutput('env-vars', Object.assign(env1, env2, env3));
         core.setOutput('deploy-path', destinations[0].deployPath);
         core.setOutput('public-url', destinations[0].publicUrl);
@@ -46918,15 +46926,17 @@ exports.getWebspace = getWebspace;
 async function applyVhosts(webspace, app, manifest, ref, appKey, httpUser) {
     const foundVhosts = await client.findVhostByWebspace(webspace.id);
     const destinations = [];
+    const phpVersion = app.php.version;
+    const phpExtensions = app.php.extensions ?? [];
     for (const [domainKey, web] of Object.entries(app.web)) {
-        const { domainName } = await configureVhosts(domainKey, web, app, ref, manifest, appKey, foundVhosts, webspace);
+        const { domainName } = await configureVhosts(domainKey, web, app, ref, manifest, appKey, foundVhosts, webspace, phpVersion);
         destinations.push({
             deployPath: `/home/${httpUser}/html`,
             publicUrl: `https://${domainName}`
         });
     }
     await pruneVhosts(foundVhosts, app, ref, manifest, appKey);
-    return { destinations };
+    return { destinations, phpVersion, phpExtensions };
 }
 exports.applyVhosts = applyVhosts;
 async function applyDatabases(databasePrefix, appKey, app, manifest) {
@@ -46939,23 +46949,22 @@ async function applyDatabases(databasePrefix, appKey, app, manifest) {
 exports.applyDatabases = applyDatabases;
 async function findOrCreateWebspace(webspaceName, app) {
     const phpv = app.php?.version ?? node_process_1.default.env.PHP_VERSION ?? null;
-    const redisEnabled = !!(app.php?.ini !== undefined &&
-        'extension=redis.so' in app.php.ini &&
-        app.php.ini['extension=redis.so']);
+    const redisEnabled = app.php?.extensions !== undefined && app.php.extensions.includes('redis');
     let webspace = await client.findOneWebspaceByName(webspaceName);
     if (null !== webspace) {
-        if (_.isEqual(webspace.cronJobs, app.cron.map(c => (0, api_client_1.transformCronJob)(c, phpv))) &&
-            redisEnabled === (webspace.redisEnabled ?? false)) {
+        if (_.isEqual(webspace.cronJobs, (app.cron ?? []).map(c => (0, api_client_1.transformCronJob)(c, phpv))) &&
+            redisEnabled === (webspace.redisEnabled ?? false) &&
+            webspace.storageQuota === (app.disk ?? 10240)) {
             core.info(`Using webspace ${webspaceName} (${webspace.id})`);
         }
         else {
             core.info(`Updating webspace ${webspaceName} (${webspace.id})`);
-            webspace = await client.updateWebspace(webspace, phpv, app.cron, redisEnabled);
+            webspace = await client.updateWebspace(webspace, phpv, app.cron, redisEnabled, app.disk ?? 10240);
         }
         return { webspace, isNew: false };
     }
     core.info('Creating a new webspace...');
-    webspace = await client.createWebspace(webspaceName, app.cron, phpv, app.pool ?? null, app.account ?? null, redisEnabled);
+    webspace = await client.createWebspace(webspaceName, app.cron ?? [], phpv, app.pool ?? null, app.account ?? null, redisEnabled, app.disk ?? 10240);
     do {
         await (0, wait_1.wait)(2000);
         core.info(`Waiting for webspace ${webspaceName} (${webspace.id}) to boot...`);
@@ -46977,12 +46986,12 @@ async function getWebspaceAccess(webspace) {
     return webspaceAccess;
 }
 exports.getWebspaceAccess = getWebspaceAccess;
-async function configureVhosts(domainName, web, app, ref, manifest, appKey, foundVhosts, webspace) {
+async function configureVhosts(domainName, web, app, ref, manifest, appKey, foundVhosts, webspace, phpVersion) {
     const actualDomainName = translateDomainName(domainName, ref, manifest, appKey);
     let vhost = foundVhosts.find(v => v.domainName === actualDomainName) ?? null;
     if (null === vhost) {
         core.info(`Configuring ${actualDomainName}...`);
-        vhost = await client.createVhost(webspace, web, app, actualDomainName);
+        vhost = await client.createVhost(webspace, web, app, actualDomainName, phpVersion);
     }
     else if (mustBeUpdated(vhost, app, web)) {
         core.info(`Configuring ${actualDomainName}...`);

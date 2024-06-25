@@ -30291,7 +30291,6 @@ exports.transformCronJob = exports.createDatabaseUser = exports.createWebspaceUs
 const core = __importStar(__nccwpck_require__(2186));
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
 const http_client_1 = __nccwpck_require__(6255);
-const node_process_1 = __importDefault(__nccwpck_require__(7742));
 const _http = new http_client_1.HttpClient();
 const token = core.getInput('auth-token', { required: true });
 const baseUri = 'https://secure.hosting.de/api';
@@ -30479,7 +30478,7 @@ async function findWebspaceUsers() {
     return response.result?.response?.data ?? [];
 }
 exports.findWebspaceUsers = findWebspaceUsers;
-async function createWebspace(name, cronjobs, phpVersion, poolId = null, accountId = null, redisEnabled = false) {
+async function createWebspace(name, cronjobs, phpVersion, poolId = null, accountId = null, redisEnabled = false, disk = 10240) {
     const user = await createWebspaceUser(name);
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/webspaceCreate`, {
         poolId,
@@ -30490,7 +30489,8 @@ async function createWebspace(name, cronjobs, phpVersion, poolId = null, account
             comments: 'Created by github action. Please do not change name.',
             productCode: 'webhosting-webspace-v1-1m',
             cronJobs: cronjobs.map(c => transformCronJob(c, phpVersion)),
-            redisEnabled
+            redisEnabled,
+            storageQuota: disk
         },
         accesses: [
             {
@@ -30508,7 +30508,7 @@ async function createWebspace(name, cronjobs, phpVersion, poolId = null, account
     return response.result.response;
 }
 exports.createWebspace = createWebspace;
-async function updateWebspace(originalWebspace, phpVersion, cronjobs = null, redisEnabled = false) {
+async function updateWebspace(originalWebspace, phpVersion, cronjobs = null, redisEnabled = false, disk = 10240) {
     const webspace = originalWebspace;
     const accesses = originalWebspace.accesses;
     if (null !== cronjobs) {
@@ -30517,6 +30517,7 @@ async function updateWebspace(originalWebspace, phpVersion, cronjobs = null, red
     if (null !== redisEnabled) {
         webspace.redisEnabled = redisEnabled;
     }
+    webspace.storageQuota = disk;
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/webspaceUpdate`, {
         authToken: token,
         webspace,
@@ -30531,7 +30532,7 @@ async function updateWebspace(originalWebspace, phpVersion, cronjobs = null, red
     return response.result.response;
 }
 exports.updateWebspace = updateWebspace;
-async function createVhost(webspace, web, app, domainName) {
+async function createVhost(webspace, web, app, domainName, phpVersion) {
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/vhostCreate`, {
         authToken: token,
         vhost: {
@@ -30541,7 +30542,7 @@ async function createVhost(webspace, web, app, domainName) {
             enableAlias: web.www ?? true,
             redirectToPrimaryName: true,
             redirectHttpToHttps: true,
-            phpVersion: app.php?.version ?? node_process_1.default.env.PHP_VERSION ?? null,
+            phpVersion,
             webRoot: `current/${web.root ?? ''}`.replace(/\/$/, ''),
             locations: Object.entries(web.locations ?? {}).map(function ([matchString, location]) {
                 return {
@@ -30564,7 +30565,7 @@ async function createVhost(webspace, web, app, domainName) {
             }
         },
         phpIni: {
-            values: transformPhpIni(app.php?.ini ?? {})
+            values: transformPhpIni(app.php?.ini ?? {}, app.php?.extensions ?? [])
         }
     });
     if (null === response.result) {
@@ -30683,7 +30684,12 @@ async function createDatabaseUser(dbUserName, accountId = null) {
     return { user: response.result.response, password };
 }
 exports.createDatabaseUser = createDatabaseUser;
-function transformPhpIni(ini) {
+function transformPhpIni(ini, extensions) {
+    for (const ext of extensions) {
+        if (['apcu', 'imagick', 'memcached', 'oauth', 'redis'].includes(ext)) {
+            ini[`extension=${ext}.so`] = 'true';
+        }
+    }
     return Object.entries(ini).map(([k, v]) => ({ key: k, value: `${v}` }));
 }
 function transformCronJob(config, phpVersion) {
@@ -30844,9 +30850,9 @@ async function run() {
         const projectPrefix = core.getInput('project-prefix', {
             required: true
         });
-        //const shallSyncFiles: boolean = !!core.getInput('files')
+        const shallSyncFiles = 'false' !== core.getInput('files');
         const shallSyncDatabases = 'false' !== core.getInput('databases');
-        const syncDatabases = core.getInput('databases').split(' ');
+        const syncDatabases = core.getInput('only-databases').split(' ');
         const { manifest, app } = await (0, config_1.config)(appKey);
         let fromEnv = core.getInput('from', { required: false });
         const toEnv = core.getInput('to', { required: true });
@@ -30855,6 +30861,29 @@ async function run() {
         }
         if ('' === fromEnv || '' === toEnv) {
             core.info('Sync destinations were not specified and cannot be derived. Please check the `project.parent` config in your manifest file.');
+        }
+        if (shallSyncFiles) {
+            for (const [appName, app1] of Object.entries(manifest.applications)) {
+                if ('' !== appKey && appName !== appKey) {
+                    continue;
+                }
+                const fromWebspace = await client.findOneWebspaceByName(`${projectPrefix}-${fromEnv}-${appName}`);
+                const toWebspace = await client.findOneWebspaceByName(`${projectPrefix}-${toEnv}-${appName}`);
+                if (null === fromWebspace) {
+                    core.info(`The webspace for app ${appName} is not present in the ${fromEnv} environment. Skipping.`);
+                    continue;
+                }
+                if (null === toWebspace) {
+                    continue;
+                }
+                const dirs = Object.values(app1.sync ?? {});
+                for (let dir of dirs) {
+                    dir = dir.trim().replace(/\/$/, '').replace(/^\//, '');
+                    const pathFrom = `/home/${fromWebspace.webspaceName}/html/current/${dir}`;
+                    const pathTo = `/home/${toWebspace.webspaceName}/html/current/${dir}`;
+                    await (0, exec_1.exec)(`/bin/bash -c "ssh -p 2244 -R localhost:50000:${toWebspace.hostName}:2244 ${fromWebspace.hostName} 'rsync -e "ssh -p 50000" -azr --delete ${pathFrom} localhost:${pathTo}'"`);
+                }
+            }
         }
         if (!shallSyncDatabases) {
             return;
@@ -31048,14 +31077,6 @@ module.exports = require("net");
 
 "use strict";
 module.exports = require("node:events");
-
-/***/ }),
-
-/***/ 7742:
-/***/ ((module) => {
-
-"use strict";
-module.exports = require("node:process");
 
 /***/ }),
 

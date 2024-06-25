@@ -3,7 +3,6 @@ import crypto from 'crypto'
 import { HttpClient } from '@actions/http-client'
 import { TypedResponse } from '@actions/http-client/lib/interfaces'
 import { CronjobConfig, ManifestApp, ManifestAppWeb } from './config'
-import process from 'node:process'
 
 const _http = new HttpClient()
 const token = core.getInput('auth-token', { required: true })
@@ -234,7 +233,8 @@ export async function createWebspace(
   phpVersion: string | null,
   poolId: string | null = null,
   accountId: string | null = null,
-  redisEnabled = false
+  redisEnabled = false,
+  disk = 10240
 ): Promise<WebspaceResult> {
   const user = await createWebspaceUser(name)
 
@@ -248,7 +248,8 @@ export async function createWebspace(
         comments: 'Created by github action. Please do not change name.',
         productCode: 'webhosting-webspace-v1-1m',
         cronJobs: cronjobs.map(c => transformCronJob(c, phpVersion)),
-        redisEnabled
+        redisEnabled,
+        storageQuota: disk
       },
       accesses: [
         {
@@ -273,7 +274,8 @@ export async function updateWebspace(
   originalWebspace: WebspaceResult,
   phpVersion: string | null,
   cronjobs: CronjobConfig[] | null = null,
-  redisEnabled = false
+  redisEnabled = false,
+  disk = 10240
 ): Promise<WebspaceResult> {
   const webspace = originalWebspace
   const accesses = originalWebspace.accesses
@@ -285,6 +287,8 @@ export async function updateWebspace(
   if (null !== redisEnabled) {
     webspace.redisEnabled = redisEnabled
   }
+
+  webspace.storageQuota = disk
 
   const response: TypedResponse<ApiActionResponse<WebspaceResult>> =
     await _http.postJson(`${baseUri}/webhosting/v1/json/webspaceUpdate`, {
@@ -308,7 +312,8 @@ export async function createVhost(
   webspace: WebspaceResult,
   web: ManifestAppWeb,
   app: ManifestApp,
-  domainName: string
+  domainName: string,
+  phpVersion: string
 ): Promise<VhostResult> {
   const response: TypedResponse<ApiActionResponse<VhostResult>> =
     await _http.postJson(`${baseUri}/webhosting/v1/json/vhostCreate`, {
@@ -320,7 +325,7 @@ export async function createVhost(
         enableAlias: web.www ?? true,
         redirectToPrimaryName: true,
         redirectHttpToHttps: true,
-        phpVersion: app.php?.version ?? process.env.PHP_VERSION ?? null,
+        phpVersion,
         webRoot: `current/${web.root ?? ''}`.replace(/\/$/, ''),
         locations: Object.entries(web.locations ?? {}).map(function ([
           matchString,
@@ -347,7 +352,7 @@ export async function createVhost(
         }
       },
       phpIni: {
-        values: transformPhpIni(app.php?.ini ?? {})
+        values: transformPhpIni(app.php?.ini ?? {}, app.php?.extensions ?? [])
       }
     })
 
@@ -511,7 +516,16 @@ export async function createDatabaseUser(
   return { user: response.result.response, password }
 }
 
-function transformPhpIni(ini: object): object {
+function transformPhpIni(
+  ini: { [key: string]: string | boolean },
+  extensions: string[]
+): object {
+  for (const ext of extensions) {
+    if (['apcu', 'imagick', 'memcached', 'oauth', 'redis'].includes(ext)) {
+      ini[`extension=${ext}.so`] = 'true'
+    }
+  }
+
   return Object.entries(ini).map(([k, v]) => ({ key: k, value: `${v}` }))
 }
 
@@ -635,6 +649,7 @@ interface WebspaceResult {
   hostName: string
   poolId: string
   cronJobs: CronJob[]
+  storageQuota: number
   redisEnabled: boolean
   status: string
   accesses: WebspaceAccess[]

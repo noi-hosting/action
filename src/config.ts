@@ -29,8 +29,9 @@ interface Manifest {
 interface ManifestApp {
   pool?: string
   account?: string
-  php?: {
-    version?: string
+  php: {
+    version: string
+    extensions?: string[]
     ini?: {
       [key: string]: string | boolean
     }
@@ -44,7 +45,9 @@ interface ManifestApp {
   web: {
     [domainName: string]: ManifestAppWeb
   }
-  cron: CronjobConfig[]
+  disk?: number
+  sync?: string[]
+  cron?: CronjobConfig[]
 }
 
 interface ManifestAppWeb {

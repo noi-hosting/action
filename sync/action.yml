@@ -20,9 +20,10 @@ inputs:
     description: You can disable sync of files.
     default: 'true'
   databases:
-    description:
-      You can limit sync of databases to given. "False" will disable sync of
-      databases.
+    description: You can disable sync of databases.
+    default: 'true'
+  only-databases:
+    description: You can limit sync of databases to given.
     default: ''
   project-prefix:
     description:
