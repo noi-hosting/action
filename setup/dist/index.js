@@ -46419,6 +46419,23 @@ async function findDatabases(databaseNames) {
             ]
         }
     });
+    core.info(JSON.stringify({
+        authToken: token,
+        filter: {
+            subFilterConnective: 'AND',
+            subFilter: [
+                {
+                    subFilterConnective: 'OR',
+                    subFilter: filter
+                },
+                {
+                    field: 'databaseStatus',
+                    value: 'active'
+                }
+            ]
+        }
+    }));
+    core.info(JSON.stringify(response.result));
     return response.result?.response?.data ?? [];
 }
 exports.findDatabases = findDatabases;

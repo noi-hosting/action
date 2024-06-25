@@ -67,8 +67,6 @@ export async function run(): Promise<void> {
       )
     }
 
-    core.info(JSON.stringify(dbQueries))
-
     if (!dbQueries.length) {
       return
     }
@@ -116,7 +114,6 @@ export async function run(): Promise<void> {
 
     core.info(JSON.stringify(migrations))
     for (const migration of Object.values(migrations)) {
-      core.info(JSON.stringify(migration))
       if (!('from' in migration)) {
         core.info(
           `Found database "${migration.to.humanName}" but this database is not present in the "${fromEnv}" environment`

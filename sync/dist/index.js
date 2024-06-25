@@ -30433,6 +30433,23 @@ async function findDatabases(databaseNames) {
             ]
         }
     });
+    core.info(JSON.stringify({
+        authToken: token,
+        filter: {
+            subFilterConnective: 'AND',
+            subFilter: [
+                {
+                    subFilterConnective: 'OR',
+                    subFilter: filter
+                },
+                {
+                    field: 'databaseStatus',
+                    value: 'active'
+                }
+            ]
+        }
+    }));
+    core.info(JSON.stringify(response.result));
     return response.result?.response?.data ?? [];
 }
 exports.findDatabases = findDatabases;
@@ -30870,7 +30887,6 @@ async function run() {
         else {
             throw new Error(`Cannot find "applications.${appKey}" in the ".hosting/config.yaml" manifest.`);
         }
-        core.info(JSON.stringify(dbQueries));
         if (!dbQueries.length) {
             return;
         }
@@ -30903,7 +30919,6 @@ async function run() {
         }
         core.info(JSON.stringify(migrations));
         for (const migration of Object.values(migrations)) {
-            core.info(JSON.stringify(migration));
             if (!('from' in migration)) {
                 core.info(`Found database "${migration.to.humanName}" but this database is not present in the "${fromEnv}" environment`);
                 continue;
