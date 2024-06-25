@@ -46273,7 +46273,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.transformCronJob = exports.createDatabaseUser = exports.createWebspaceUser = exports.addDatabaseAccess = exports.createDatabase = exports.createVhost = exports.updateWebspace = exports.createWebspace = exports.findWebspaceUsers = exports.findDatabaseAccesses = exports.findDatabasesByPrefix = exports.deleteDatabaseById = exports.deleteVhostById = exports.deleteWebspaceById = exports.findVhostByWebspace = exports.findWebspaceById = exports.findOneWebspaceByName = exports.findActiveWebspaces = void 0;
+exports.transformCronJob = exports.createDatabaseUser = exports.createWebspaceUser = exports.addDatabaseAccess = exports.createDatabase = exports.createVhost = exports.updateWebspace = exports.createWebspace = exports.findWebspaceUsers = exports.findDatabaseAccesses = exports.findDatabases = exports.deleteDatabaseUserById = exports.deleteDatabaseById = exports.deleteVhostById = exports.deleteWebspaceById = exports.findVhostByWebspace = exports.findWebspaceById = exports.findOneWebspaceByName = exports.findActiveWebspaces = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
 const http_client_1 = __nccwpck_require__(6255);
@@ -46378,15 +46378,32 @@ async function deleteDatabaseById(databaseId) {
     });
 }
 exports.deleteDatabaseById = deleteDatabaseById;
-async function findDatabasesByPrefix(databasePrefix) {
+async function deleteDatabaseUserById(userId) {
+    await _http.postJson(`${baseUri}/database/v1/json/userDelete`, {
+        authToken: token,
+        userId
+    });
+}
+exports.deleteDatabaseUserById = deleteDatabaseUserById;
+async function findDatabases(databaseNames) {
+    if (typeof databaseNames === 'string') {
+        databaseNames = [databaseNames];
+    }
+    const filter = [];
+    for (const q of databaseNames) {
+        filter.push({
+            field: 'databaseName',
+            value: q
+        });
+    }
     const response = await _http.postJson(`${baseUri}/database/v1/json/databasesFind`, {
         authToken: token,
         filter: {
             subFilterConnective: 'AND',
             subFilter: [
                 {
-                    field: 'databaseName',
-                    value: `${databasePrefix}-*`
+                    subFilterConnective: 'OR',
+                    subFilter: filter
                 },
                 {
                     field: 'databaseStatus',
@@ -46397,7 +46414,7 @@ async function findDatabasesByPrefix(databasePrefix) {
     });
     return response.result?.response?.data ?? [];
 }
-exports.findDatabasesByPrefix = findDatabasesByPrefix;
+exports.findDatabases = findDatabases;
 async function findDatabaseAccesses(userName, databaseId) {
     const response = await _http.postJson(`${baseUri}/database/v1/json/usersFind`, {
         authToken: token,
@@ -46560,11 +46577,10 @@ async function createDatabase(dbUserName, databaseName, poolId = null, accountId
     };
 }
 exports.createDatabase = createDatabase;
-async function addDatabaseAccess(database, dbUserName, accountId = null) {
-    const { user, password } = await createDatabaseUser(dbUserName, accountId);
+async function addDatabaseAccess(database, dbUser) {
     const accesses = database.accesses;
     accesses.push({
-        userId: user.id,
+        userId: dbUser.id,
         databaseId: database.id,
         accessLevel: ['read', 'write', 'schema']
     });
@@ -46587,11 +46603,10 @@ async function addDatabaseAccess(database, dbUserName, accountId = null) {
         throw new Error(JSON.stringify(response.result.errors ?? []));
     }
     const result = response.result.response;
-    const access = result.accesses.find(a => a.userId === user.id) ?? null;
+    const access = result.accesses.find(a => a.userId === dbUser.id) ?? null;
     return {
         database: result,
-        databaseUserName: access?.dbLogin ?? '',
-        databasePassword: password
+        dbLogin: access?.dbLogin ?? ''
     };
 }
 exports.addDatabaseAccess = addDatabaseAccess;
@@ -46738,9 +46753,6 @@ const fs_1 = __importDefault(__nccwpck_require__(7147));
 async function config(appKey) {
     const manifest = yaml.load(fs_1.default.readFileSync('./.hosting/config.yaml', 'utf8'));
     const app = manifest.applications[appKey] ?? null;
-    if (null === app) {
-        throw new Error(`Cannot find "applications.${appKey}" in the ".hosting/config.yaml" manifest.`);
-    }
     const envVars = app.env ?? {};
     return { manifest, app, envVars };
 }
@@ -46749,7 +46761,84 @@ exports.config = config;
 
 /***/ }),
 
-/***/ 3711:
+/***/ 2777:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+// noinspection ExceptionCaughtLocallyJS
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.run = void 0;
+const core = __importStar(__nccwpck_require__(2186));
+const services = __importStar(__nccwpck_require__(1933));
+const process = __importStar(__nccwpck_require__(7742));
+const config_1 = __nccwpck_require__(6373);
+/**
+ * The main function for the action.
+ * @returns {Promise<void>} Resolves when the action is complete.
+ */
+async function run() {
+    try {
+        // https://github.com/actions/toolkit/issues/1315
+        const ref = process.env.GITHUB_REF_NAME ?? 'na';
+        const appKey = core.getInput('app', { required: true });
+        const projectPrefix = core.getInput('project-prefix', {
+            required: true
+        });
+        const webspaceName = `${projectPrefix}-${ref}-${appKey}`.trim();
+        const databasePrefix = `${projectPrefix}-${ref}`.trim();
+        const { manifest, app, envVars: env1 } = await (0, config_1.config)(appKey);
+        if (null === app) {
+            throw new Error(`Cannot find "applications.${appKey}" in the ".hosting/config.yaml" manifest.`);
+        }
+        const { webspace, sshHost, sshUser, httpUser, envVars: env2 } = await services.getWebspace(webspaceName, app);
+        const { destinations } = await services.applyVhosts(webspace, app, manifest, ref, appKey, httpUser);
+        const { envVars: env3 } = await services.applyDatabases(databasePrefix, appKey, app, manifest);
+        core.setOutput('ssh-user', sshUser);
+        core.setOutput('ssh-host', sshHost);
+        core.setOutput('ssh-port', 2244);
+        core.setOutput('http-user', httpUser);
+        core.setOutput('env-vars', Object.assign(env1, env2, env3));
+        core.setOutput('deploy-path', destinations[0].deployPath);
+        core.setOutput('public-url', destinations[0].publicUrl);
+        if (manifest.project?.prune ?? true) {
+            await services.pruneBranches(projectPrefix);
+        }
+    }
+    catch (error) {
+        if (error instanceof Error)
+            core.setFailed(error.message);
+    }
+}
+exports.run = run;
+
+
+/***/ }),
+
+/***/ 1933:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -46820,7 +46909,7 @@ async function applyVhosts(webspace, app, manifest, ref, appKey, httpUser) {
 exports.applyVhosts = applyVhosts;
 async function applyDatabases(databasePrefix, appKey, app, manifest) {
     const envVars = {};
-    const foundDatabases = await client.findDatabasesByPrefix(databasePrefix);
+    const foundDatabases = await client.findDatabases(`${databasePrefix}-*`);
     await configureDatabases(app, databasePrefix, appKey, foundDatabases, envVars);
     await pruneDatabases(manifest, databasePrefix, foundDatabases);
     return { envVars };
@@ -46904,8 +46993,9 @@ async function configureDatabases(app, databasePrefix, appKey, foundDatabases, e
             }
             else {
                 core.info(`Granting access on database ${databaseInternalName}`);
-                const { database, databaseUserName, databasePassword } = await client.addDatabaseAccess(existingDatabase, dbUserName, app.account ?? null);
-                defineEnv(envVars, relationName, database, databaseUserName, databasePassword);
+                const { user: dbUser, password: databasePassword } = await client.createDatabaseUser(dbUserName, app.account ?? null);
+                const { database, dbLogin } = await client.addDatabaseAccess(existingDatabase, dbUser);
+                defineEnv(envVars, relationName, database, dbLogin, databasePassword);
             }
         }
         else {
@@ -46957,7 +47047,7 @@ async function pruneBranches(projectPrefix) {
         if (!branches.includes(match[1])) {
             core.info(`Deleting webspace ${webspace.name}`);
             await client.deleteWebspaceById(webspace.id);
-            const databases = await client.findDatabasesByPrefix(`${projectPrefix}-${match[1]}`.trim());
+            const databases = await client.findDatabases(`${projectPrefix}-${match[1]}-*`.trim());
             for (const d of databases) {
                 core.info(`Deleting database ${d.name}`);
                 await client.deleteDatabaseById(d.id);
@@ -47001,80 +47091,6 @@ function mustBeUpdated(vhost, app, web) {
     // todo locations
     return false;
 }
-
-
-/***/ }),
-
-/***/ 2777:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-// noinspection ExceptionCaughtLocallyJS
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.run = void 0;
-const core = __importStar(__nccwpck_require__(2186));
-const services = __importStar(__nccwpck_require__(3711));
-const process = __importStar(__nccwpck_require__(7742));
-const config_1 = __nccwpck_require__(6373);
-/**
- * The main function for the action.
- * @returns {Promise<void>} Resolves when the action is complete.
- */
-async function run() {
-    try {
-        // https://github.com/actions/toolkit/issues/1315
-        const ref = process.env.GITHUB_REF_NAME ?? 'na';
-        const appKey = core.getInput('app', { required: true });
-        const projectPrefix = core.getInput('project-prefix', {
-            required: true
-        });
-        const webspaceName = `${projectPrefix}-${ref}-${appKey}`.trim();
-        const databasePrefix = `${projectPrefix}-${ref}`.trim();
-        const { manifest, app, envVars: env1 } = await (0, config_1.config)(appKey);
-        const { webspace, sshHost, sshUser, httpUser, envVars: env2 } = await services.getWebspace(webspaceName, app);
-        const { destinations } = await services.applyVhosts(webspace, app, manifest, ref, appKey, httpUser);
-        const { envVars: env3 } = await services.applyDatabases(databasePrefix, appKey, app, manifest);
-        core.setOutput('ssh-user', sshUser);
-        core.setOutput('ssh-host', sshHost);
-        core.setOutput('ssh-port', 2244);
-        core.setOutput('http-user', httpUser);
-        core.setOutput('env-vars', Object.assign(env1, env2, env3));
-        core.setOutput('deploy-path', destinations[0].deployPath);
-        core.setOutput('public-url', destinations[0].publicUrl);
-        if (manifest.project?.prune ?? true) {
-            await services.pruneBranches(projectPrefix);
-        }
-    }
-    catch (error) {
-        if (error instanceof Error)
-            core.setFailed(error.message);
-    }
-}
-exports.run = run;
 
 
 /***/ }),

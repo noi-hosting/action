@@ -1,7 +1,7 @@
 // noinspection ExceptionCaughtLocallyJS
 
 import * as core from '@actions/core'
-import * as services from '../services'
+import * as services from './services'
 import * as process from 'node:process'
 import { config } from '../config'
 
@@ -20,6 +20,11 @@ export async function run(): Promise<void> {
     const webspaceName: string = `${projectPrefix}-${ref}-${appKey}`.trim()
     const databasePrefix: string = `${projectPrefix}-${ref}`.trim()
     const { manifest, app, envVars: env1 } = await config(appKey)
+    if (null === app) {
+      throw new Error(
+        `Cannot find "applications.${appKey}" in the ".hosting/config.yaml" manifest.`
+      )
+    }
 
     const {
       webspace,

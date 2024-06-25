@@ -1,9 +1,11 @@
 // noinspection ExceptionCaughtLocallyJS
 
 import * as core from '@actions/core'
-import * as services from '../services'
-import * as process from 'node:process'
+import { exec } from '@actions/exec'
+import * as client from '../api-client'
 import { config } from '../config'
+import crypto from 'crypto'
+import { findDatabases } from '../api-client'
 
 /**
  * The main function for the action.
@@ -11,50 +13,108 @@ import { config } from '../config'
  */
 export async function run(): Promise<void> {
   try {
-    // https://github.com/actions/toolkit/issues/1315
-    const ref = process.env.GITHUB_REF_NAME ?? 'na'
-    const appKey: string = core.getInput('app', { required: true })
+    const appKey: string = core.getInput('app', { required: false })
     const projectPrefix: string = core.getInput('project-prefix', {
       required: true
     })
-    const webspaceName: string = `${projectPrefix}-${ref}-${appKey}`.trim()
-    const databasePrefix: string = `${projectPrefix}-${ref}`.trim()
-    const { manifest, app, envVars: env1 } = await config(appKey)
+    const { manifest, app } = await config(appKey)
 
-    const {
-      webspace,
-      sshHost,
-      sshUser,
-      httpUser,
-      envVars: env2
-    } = await services.getWebspace(webspaceName, app)
-
-    const { destinations } = await services.applyVhosts(
-      webspace,
-      app,
-      manifest,
-      ref,
-      appKey,
-      httpUser
-    )
-    const { envVars: env3 } = await services.applyDatabases(
-      databasePrefix,
-      appKey,
-      app,
-      manifest
-    )
-
-    core.setOutput('ssh-user', sshUser)
-    core.setOutput('ssh-host', sshHost)
-    core.setOutput('ssh-port', 2244)
-    core.setOutput('http-user', httpUser)
-    core.setOutput('env-vars', Object.assign(env1, env2, env3))
-    core.setOutput('deploy-path', destinations[0].deployPath)
-    core.setOutput('public-url', destinations[0].publicUrl)
-
-    if (manifest.project?.prune ?? true) {
-      await services.pruneBranches(projectPrefix)
+    let fromEnv = core.getInput('from', { required: false })
+    const toEnv = core.getInput('to', { required: true })
+    if ('' === fromEnv) {
+      fromEnv = manifest.project?.parent ?? ''
     }
+
+    if ('' === fromEnv || '' === toEnv) {
+      throw new Error(
+        'Sync destinations were not specified and cannot be derived. Please check the `project.parent` config in your manifest file.'
+      )
+    }
+
+    core.info(
+      `Syncing databases from environment "${fromEnv}" to environment "${toEnv}"`
+    )
+
+    const dbQueries: string[] = []
+    if ('' === appKey) {
+      dbQueries.push(`${projectPrefix}-${fromEnv}-*`)
+      dbQueries.push(`${projectPrefix}-${toEnv}-*`)
+    } else if (null !== app) {
+      for (const relationName of Object.values(app.databases ?? {})) {
+        dbQueries.push(`${projectPrefix}-${fromEnv}-${relationName}`)
+        dbQueries.push(`${projectPrefix}-${toEnv}-${relationName}`)
+      }
+    } else {
+      throw new Error(
+        `Cannot find "applications.${appKey}" in the ".hosting/config.yaml" manifest.`
+      )
+    }
+
+    if (!dbQueries.length) {
+      return
+    }
+
+    const migrations: {
+      [relationName: string]: {
+        [direction: string]: {
+          host: string
+          user: string
+          password: string
+          name: string
+          humanName: string
+        }
+      }
+    } = {}
+
+    const dbUsername = `gh${crypto.randomInt(1000000, 9999999)}`
+    const { user: dbUser, password: dbPassword } =
+      await client.createDatabaseUser(dbUsername)
+    const foundDatabases = await findDatabases(dbQueries)
+
+    for (const db of foundDatabases) {
+      const { dbLogin } = await client.addDatabaseAccess(db, dbUser)
+      const dbHost = db.hostName
+      const dbEnv = db.name.split('-')[1] ?? null
+      const dbRelationName = db.name.split('-')[2] ?? null
+
+      let k
+      if (dbEnv === fromEnv) {
+        k = 'from'
+      } else if (dbEnv === toEnv) {
+        k = 'to'
+      } else {
+        throw new Error(`Unexpected database environment "${dbEnv}"`)
+      }
+
+      migrations[dbRelationName][k] = {
+        host: dbHost,
+        user: dbLogin,
+        password: dbPassword,
+        name: db.dbName,
+        humanName: db.name
+      }
+    }
+
+    for (const migration of Object.values(migrations)) {
+      if (!('from' in migration)) {
+        core.info(
+          `Found database "${migration.to.humanName}" but this database is not present in the "${fromEnv}" environment`
+        )
+        continue
+      } else if (!('to' in migration)) {
+        continue
+      }
+
+      core.info(
+        `Database "${migration.to.humanName}" will be overridden using database "${migration.from.humanName}"`
+      )
+
+      await exec(
+        `mysqldump -h ${migration.from.host} -u ${migration.from.user} -p'${migration.from.password}' ${migration.from.name} | mysql -h ${migration.to.host} -u ${migration.to.user} -p'${migration.to.password}' ${migration.to.name}`
+      )
+    }
+
+    await client.deleteDatabaseUserById(dbUser.id)
   } catch (error) {
     if (error instanceof Error) core.setFailed(error.message)
   }

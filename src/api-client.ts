@@ -124,9 +124,28 @@ export async function deleteDatabaseById(databaseId: string): Promise<void> {
   })
 }
 
-export async function findDatabasesByPrefix(
-  databasePrefix: string
+export async function deleteDatabaseUserById(userId: string): Promise<void> {
+  await _http.postJson(`${baseUri}/database/v1/json/userDelete`, {
+    authToken: token,
+    userId
+  })
+}
+
+export async function findDatabases(
+  databaseNames: string | string[]
 ): Promise<DatabaseResult[]> {
+  if (typeof databaseNames === 'string') {
+    databaseNames = [databaseNames]
+  }
+
+  const filter = []
+  for (const q of databaseNames) {
+    filter.push({
+      field: 'databaseName',
+      value: q
+    })
+  }
+
   const response: TypedResponse<ApiFindResponse<DatabaseResult>> =
     await _http.postJson(`${baseUri}/database/v1/json/databasesFind`, {
       authToken: token,
@@ -134,8 +153,8 @@ export async function findDatabasesByPrefix(
         subFilterConnective: 'AND',
         subFilter: [
           {
-            field: 'databaseName',
-            value: `${databasePrefix}-*`
+            subFilterConnective: 'OR',
+            subFilter: filter
           },
           {
             field: 'databaseStatus',
@@ -371,17 +390,14 @@ export async function createDatabase(
 
 export async function addDatabaseAccess(
   database: DatabaseResult,
-  dbUserName: string,
-  accountId: string | null = null
+  dbUser: DatabaseUserResult
 ): Promise<{
   database: DatabaseResult
-  databaseUserName: string
-  databasePassword: string
+  dbLogin: string
 }> {
-  const { user, password } = await createDatabaseUser(dbUserName, accountId)
   const accesses = database.accesses
   accesses.push({
-    userId: user.id,
+    userId: dbUser.id,
     databaseId: database.id,
     accessLevel: ['read', 'write', 'schema']
   })
@@ -409,12 +425,11 @@ export async function addDatabaseAccess(
   }
 
   const result = response.result.response
-  const access = result.accesses.find(a => a.userId === user.id) ?? null
+  const access = result.accesses.find(a => a.userId === dbUser.id) ?? null
 
   return {
     database: result,
-    databaseUserName: access?.dbLogin ?? '',
-    databasePassword: password
+    dbLogin: access?.dbLogin ?? ''
   }
 }
 

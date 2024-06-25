@@ -1,16 +1,16 @@
-import * as client from './api-client'
+import * as client from '../api-client'
 import * as core from '@actions/core'
 import process from 'node:process'
-import { wait } from './wait'
+import { wait } from '../wait'
 import * as _ from 'lodash'
-import { Manifest, ManifestApp, ManifestAppWeb } from './config'
+import { Manifest, ManifestApp, ManifestAppWeb } from '../config'
 import {
   DatabaseResult,
   transformCronJob,
   VhostResult,
   WebspaceAccess,
   WebspaceResult
-} from './api-client'
+} from '../api-client'
 
 export async function getWebspace(
   webspaceName: string,
@@ -82,7 +82,7 @@ export async function applyDatabases(
   manifest: Manifest
 ): Promise<{ envVars: { [key: string]: string | boolean | number } }> {
   const envVars = {}
-  const foundDatabases = await client.findDatabasesByPrefix(databasePrefix)
+  const foundDatabases = await client.findDatabases(`${databasePrefix}-*`)
 
   await configureDatabases(app, databasePrefix, appKey, foundDatabases, envVars)
   await pruneDatabases(manifest, databasePrefix, foundDatabases)
@@ -250,20 +250,14 @@ export async function configureDatabases(
       } else {
         core.info(`Granting access on database ${databaseInternalName}`)
 
-        const { database, databaseUserName, databasePassword } =
-          await client.addDatabaseAccess(
-            existingDatabase,
-            dbUserName,
-            app.account ?? null
-          )
-
-        defineEnv(
-          envVars,
-          relationName,
-          database,
-          databaseUserName,
-          databasePassword
+        const { user: dbUser, password: databasePassword } =
+          await client.createDatabaseUser(dbUserName, app.account ?? null)
+        const { database, dbLogin } = await client.addDatabaseAccess(
+          existingDatabase,
+          dbUser
         )
+
+        defineEnv(envVars, relationName, database, dbLogin, databasePassword)
       }
     } else {
       core.info(`Creating database ${databaseInternalName}`)
@@ -352,8 +346,8 @@ export async function pruneBranches(projectPrefix: string): Promise<void> {
       core.info(`Deleting webspace ${webspace.name}`)
       await client.deleteWebspaceById(webspace.id)
 
-      const databases = await client.findDatabasesByPrefix(
-        `${projectPrefix}-${match[1]}`.trim()
+      const databases = await client.findDatabases(
+        `${projectPrefix}-${match[1]}-*`.trim()
       )
       for (const d of databases) {
         core.info(`Deleting database ${d.name}`)

@@ -3,19 +3,13 @@ import fs from 'fs'
 
 export async function config(appKey: string): Promise<{
   manifest: Manifest
-  app: ManifestApp
+  app: ManifestApp | null
   envVars: { [key: string]: string | boolean | number }
 }> {
   const manifest = yaml.load(
     fs.readFileSync('./.hosting/config.yaml', 'utf8')
   ) as Manifest
   const app = manifest.applications[appKey] ?? null
-  if (null === app) {
-    throw new Error(
-      `Cannot find "applications.${appKey}" in the ".hosting/config.yaml" manifest.`
-    )
-  }
-
   const envVars = app.env ?? {}
 
   return { manifest, app, envVars }
