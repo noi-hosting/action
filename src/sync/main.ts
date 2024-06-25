@@ -26,7 +26,7 @@ export async function run(): Promise<void> {
     }
 
     if ('' === fromEnv || '' === toEnv) {
-      throw new Error(
+      core.info(
         'Sync destinations were not specified and cannot be derived. Please check the `project.parent` config in your manifest file.'
       )
     }

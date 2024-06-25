@@ -30832,7 +30832,7 @@ async function run() {
             fromEnv = manifest.project?.parent ?? '';
         }
         if ('' === fromEnv || '' === toEnv) {
-            throw new Error('Sync destinations were not specified and cannot be derived. Please check the `project.parent` config in your manifest file.');
+            core.info('Sync destinations were not specified and cannot be derived. Please check the `project.parent` config in your manifest file.');
         }
         core.info(`Syncing databases from environment "${fromEnv}" to environment "${toEnv}"`);
         const dbQueries = [];

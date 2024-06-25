@@ -79,14 +79,13 @@ runs:
         project-prefix: ${{ inputs.project-prefix }}
         ssh-public-key: ${{ inputs.ssh-public-key }}
 
-    #    # Sync app
-    #    - name: Setup Hosting.de environment
-    #      if: ${{ steps.outputs.hosting.shall-sync }}
-    #      uses: richardhj/sync-hostingde@main
-    #      with:
-    #        from: '' # parent
-    #        to: ${{ github.ref_name }} # must not be a parent environment
-    #        app: ${{ inputs.app }} # allow empty
+    # Sync app
+    - name: Sync environments
+      if: ${{ steps.outputs.hosting.shall-sync }}
+      uses: richardhj/setup-hostingde/sync@main
+      with:
+        to: ${{ github.ref_name }}
+        app: ${{ inputs.app }}
 
     # We need jq for json processing
     - name: Install jq
