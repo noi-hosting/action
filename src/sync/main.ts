@@ -86,8 +86,10 @@ export async function run(): Promise<void> {
     const dbUsername = `gh${crypto.randomInt(1000000, 9999999)}`
     const { user: dbUser, password: dbPassword } =
       await client.createDatabaseUser(dbUsername)
-    const foundDatabases = await findDatabases(dbQueries)
 
+    core.setSecret(dbPassword)
+
+    const foundDatabases = await findDatabases(dbQueries)
     for (const db of foundDatabases) {
       const { dbLogin } = await client.addDatabaseAccess(db, dbUser)
       const dbHost = db.hostName
@@ -113,7 +115,6 @@ export async function run(): Promise<void> {
       }
     }
 
-    core.info(JSON.stringify(migrations))
     for (const migration of Object.values(migrations)) {
       if (!('from' in migration)) {
         core.info(
@@ -128,8 +129,12 @@ export async function run(): Promise<void> {
         `Database "${migration.to.humanName}" will be overridden using database "${migration.from.humanName}"`
       )
 
+      const filename = `${crypto.randomUUID()}.sql`
       await exec(
-        `mysqldump -h ${migration.from.host} -u ${migration.from.user} -p'${migration.from.password}' ${migration.from.name} | mysql -h ${migration.to.host} -u ${migration.to.user} -p'${migration.to.password}' ${migration.to.name}`
+        `mysqldump -h ${migration.from.host} -u ${migration.from.user} -p'${migration.from.password}' ${migration.from.name} > ${filename}`
+      )
+      await exec(
+        `mysql -h ${migration.to.host} -u ${migration.to.user} -p'${migration.to.password}' ${migration.to.name} < ${filename}`
       )
     }
 

@@ -30888,6 +30888,7 @@ async function run() {
         const migrations = {};
         const dbUsername = `gh${crypto_1.default.randomInt(1000000, 9999999)}`;
         const { user: dbUser, password: dbPassword } = await client.createDatabaseUser(dbUsername);
+        core.setSecret(dbPassword);
         const foundDatabases = await (0, api_client_1.findDatabases)(dbQueries);
         for (const db of foundDatabases) {
             const { dbLogin } = await client.addDatabaseAccess(db, dbUser);
@@ -30913,7 +30914,6 @@ async function run() {
                 humanName: db.name
             };
         }
-        core.info(JSON.stringify(migrations));
         for (const migration of Object.values(migrations)) {
             if (!('from' in migration)) {
                 core.info(`Found database "${migration.to.humanName}" but this database is not present in the "${fromEnv}" environment`);
@@ -30923,7 +30923,9 @@ async function run() {
                 continue;
             }
             core.info(`Database "${migration.to.humanName}" will be overridden using database "${migration.from.humanName}"`);
-            await (0, exec_1.exec)(`mysqldump -h ${migration.from.host} -u ${migration.from.user} -p'${migration.from.password}' ${migration.from.name} | mysql -h ${migration.to.host} -u ${migration.to.user} -p'${migration.to.password}' ${migration.to.name}`);
+            const filename = `${crypto_1.default.randomUUID()}.sql`;
+            await (0, exec_1.exec)(`mysqldump -h ${migration.from.host} -u ${migration.from.user} -p'${migration.from.password}' ${migration.from.name} > ${filename}`);
+            await (0, exec_1.exec)(`mysql -h ${migration.to.host} -u ${migration.to.user} -p'${migration.to.password}' ${migration.to.name} < ${filename}`);
         }
         await client.deleteDatabaseUserById(dbUser.id);
     }
