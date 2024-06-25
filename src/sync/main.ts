@@ -20,9 +20,11 @@ export async function run(): Promise<void> {
     //const shallSyncFiles: boolean = !!core.getInput('sync-files')
     const shallSyncDatabases: boolean =
       'false' !== core.getInput('sync-databases')
+    core.info(shallSyncDatabases ? 'true' : 'false')
     const syncDatabases: string[] | false = core
       .getInput('sync-databases')
       .split(' ')
+    core.info(JSON.stringify(syncDatabases))
 
     const { manifest, app } = await config(appKey)
 
