@@ -46273,7 +46273,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.transformCronJob = exports.createDatabaseUser = exports.createWebspaceUser = exports.addDatabaseAccess = exports.createDatabase = exports.createVhost = exports.updateWebspace = exports.createWebspace = exports.findWebspaceUsers = exports.findDatabaseAccesses = exports.findDatabases = exports.deleteDatabaseUserById = exports.deleteDatabaseById = exports.deleteVhostById = exports.deleteWebspaceById = exports.findVhostByWebspace = exports.findWebspaceById = exports.findOneWebspaceByName = exports.findActiveWebspaces = void 0;
+exports.transformCronJob = exports.createDatabaseUser = exports.createWebspaceUser = exports.addDatabaseAccess = exports.createDatabase = exports.createVhost = exports.updateWebspace = exports.createWebspace = exports.findWebspaceUsers = exports.findDatabaseAccesses = exports.findDatabases = exports.deleteDatabaseUserById = exports.truncateDatabaseById = exports.deleteDatabaseById = exports.deleteVhostById = exports.deleteWebspaceById = exports.findVhostByWebspace = exports.findWebspaceById = exports.findOneWebspaceByName = exports.findActiveWebspaces = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
 const http_client_1 = __nccwpck_require__(6255);
@@ -46378,6 +46378,13 @@ async function deleteDatabaseById(databaseId) {
     });
 }
 exports.deleteDatabaseById = deleteDatabaseById;
+async function truncateDatabaseById(databaseId) {
+    await _http.postJson(`${baseUri}/database/v1/json/databaseWipe`, {
+        authToken: token,
+        databaseId
+    });
+}
+exports.truncateDatabaseById = truncateDatabaseById;
 async function deleteDatabaseUserById(userId) {
     await _http.postJson(`${baseUri}/database/v1/json/userDelete`, {
         authToken: token,
@@ -47003,8 +47010,7 @@ async function configureDatabases(app, databasePrefix, appKey, foundDatabases, e
         else {
             core.info(`Creating database ${databaseInternalName}`);
             const { database, databaseUserName, databasePassword } = await client.createDatabase(dbUserName, databaseInternalName, app.pool ?? null);
-            newDatabases.push(relationName);
-            core.info(JSON.stringify(newDatabases));
+            newDatabases.push(databaseName);
             defineEnv(envVars, relationName, database, databaseUserName, databasePassword);
         }
     }

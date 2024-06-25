@@ -124,6 +124,13 @@ export async function deleteDatabaseById(databaseId: string): Promise<void> {
   })
 }
 
+export async function truncateDatabaseById(databaseId: string): Promise<void> {
+  await _http.postJson(`${baseUri}/database/v1/json/databaseWipe`, {
+    authToken: token,
+    databaseId
+  })
+}
+
 export async function deleteDatabaseUserById(userId: string): Promise<void> {
   await _http.postJson(`${baseUri}/database/v1/json/userDelete`, {
     authToken: token,
