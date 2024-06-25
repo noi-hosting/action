@@ -279,6 +279,7 @@ export async function configureDatabases(
         )
 
       newDatabases.push(relationName)
+      core.info(JSON.stringify(newDatabases))
 
       defineEnv(
         envVars,
