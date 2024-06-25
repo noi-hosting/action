@@ -103,6 +103,7 @@ export async function run(): Promise<void> {
         throw new Error(`Unexpected database environment "${dbEnv}"`)
       }
 
+      migrations[dbName] = migrations[dbName] || {}
       migrations[dbName][k] = {
         host: dbHost,
         user: dbLogin,

@@ -30904,6 +30904,7 @@ async function run() {
             else {
                 throw new Error(`Unexpected database environment "${dbEnv}"`);
             }
+            migrations[dbName] = migrations[dbName] || {};
             migrations[dbName][k] = {
                 host: dbHost,
                 user: dbLogin,
