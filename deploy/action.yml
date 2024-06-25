@@ -86,6 +86,7 @@ runs:
 #        steps.outputs.hosting.sync-databases }}
       uses: richardhj/setup-hostingde/sync@main
       with:
+        auth-token: ${{ inputs.auth-token }}
         to: ${{ github.ref_name }}
         files: ${{ steps.outputs.hosting.sync-files }}
         databases: ${{ steps.outputs.hosting.sync-databases || 'false' }}
