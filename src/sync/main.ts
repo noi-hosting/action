@@ -131,10 +131,10 @@ export async function run(): Promise<void> {
 
       const filename = `${crypto.randomUUID()}.sql`
       await exec(
-        `mysqldump --host='${migration.from.host}' --user='${migration.from.user}' -p'${migration.from.password}' '${migration.from.name}' > ${filename}`
+        `mysqldump -h ${migration.from.host} -u ${migration.from.user} -p${migration.from.password} ${migration.from.name} > ${filename}`
       )
       await exec(
-        `mysql --host='${migration.to.host}' --user='${migration.to.user}' -p'${migration.to.password}' '${migration.to.name}' < ${filename}`
+        `mysql -h ${migration.to.host} -u ${migration.to.user} -p${migration.to.password} ${migration.to.name} < ${filename}`
       )
     }
 
