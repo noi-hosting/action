@@ -46916,8 +46916,7 @@ const _ = __importStar(__nccwpck_require__(250));
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
 const api_client_1 = __nccwpck_require__(5707);
 async function getWebspace(webspaceName, app) {
-    const { webspace, isNew } = await findOrCreateWebspace(webspaceName, app);
-    const webspaceAccess = await getWebspaceAccess(webspace);
+    const { webspace, webspaceAccess, isNew } = await findOrCreateWebspace(webspaceName, app);
     const envVars = {};
     const redisRelationName = Object.keys(app.relationships ?? {}).find(key => 'redis' === (app.relationships ?? {})[key]) ?? null;
     if (null !== redisRelationName) {
@@ -46975,10 +46974,12 @@ async function findOrCreateWebspace(webspaceName, app) {
         });
     }
     const availUsers = await client.findUsersByName([`github-action--${webspaceName}`].concat(additionalUsers.map(x => x.displayName)));
+    let ghUser = availUsers.find(u => u.name === `github-action--${webspaceName}`) ?? null;
     const users = [];
-    if (null === availUsers.find(u => u.name === `github-action--${webspaceName}`)) {
-        users.push(await client.createWebspaceUser(`github-action--${webspaceName}`, core.getInput('ssh-public-key', { required: true })));
+    if (null === ghUser) {
+        ghUser = await client.createWebspaceUser(`github-action--${webspaceName}`, core.getInput('ssh-public-key', { required: true }));
     }
+    users.push(ghUser);
     for (const user of additionalUsers) {
         const u = availUsers.find(x => x.name === user.displayName) ?? null;
         if (null !== u) {
@@ -47004,7 +47005,11 @@ async function findOrCreateWebspace(webspaceName, app) {
             core.info(`Updating webspace ${webspaceName} (${webspace.id})`);
             webspace = await client.updateWebspace(webspace, users, phpv, app.cron, redisEnabled, app.disk ?? 10240);
         }
-        return { webspace, isNew: false };
+        const webspaceAccess = webspace.accesses.find(a => (ghUser.id = a.userId)) ?? null;
+        if (null === webspaceAccess) {
+            throw new Error(`Unexpected error`);
+        }
+        return { webspace, webspaceAccess, isNew: false };
     }
     core.info('Creating a new webspace...');
     webspace = await client.createWebspace(webspaceName, users, app.cron ?? [], phpv, app.pool ?? null, app.account ?? null, redisEnabled, app.disk ?? 10240);
@@ -47016,7 +47021,11 @@ async function findOrCreateWebspace(webspaceName, app) {
             throw new Error(`Unexpected error.`);
         }
     } while ('active' !== webspace.status);
-    return { webspace, isNew: true };
+    const webspaceAccess = webspace.accesses.find(a => (ghUser.id = a.userId)) ?? null;
+    if (null === webspaceAccess) {
+        throw new Error(`Unexpected error`);
+    }
+    return { webspace, webspaceAccess, isNew: true };
 }
 exports.findOrCreateWebspace = findOrCreateWebspace;
 async function getWebspaceAccess(webspace) {

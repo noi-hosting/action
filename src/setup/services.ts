@@ -25,8 +25,10 @@ export async function getWebspace(
   httpUser: string
   envVars: { [key: string]: string | boolean | number }
 }> {
-  const { webspace, isNew } = await findOrCreateWebspace(webspaceName, app)
-  const webspaceAccess = await getWebspaceAccess(webspace)
+  const { webspace, webspaceAccess, isNew } = await findOrCreateWebspace(
+    webspaceName,
+    app
+  )
 
   const envVars: { [key: string]: string | boolean | number } = {}
 
@@ -120,7 +122,11 @@ export async function applyDatabases(
 export async function findOrCreateWebspace(
   webspaceName: string,
   app: ManifestApp
-): Promise<{ webspace: WebspaceResult; isNew: boolean }> {
+): Promise<{
+  webspace: WebspaceResult
+  webspaceAccess: WebspaceAccess
+  isNew: boolean
+}> {
   const phpv = app.php?.version ?? process.env.PHP_VERSION ?? null
   const redisEnabled = Object.values(app.relationships ?? {}).includes('redis')
   let webspace: WebspaceResult | null =
@@ -146,17 +152,17 @@ export async function findOrCreateWebspace(
     )
   )
 
+  let ghUser =
+    availUsers.find(u => u.name === `github-action--${webspaceName}`) ?? null
   const users: UserResult[] = []
-  if (
-    null === availUsers.find(u => u.name === `github-action--${webspaceName}`)
-  ) {
-    users.push(
-      await client.createWebspaceUser(
-        `github-action--${webspaceName}`,
-        core.getInput('ssh-public-key', { required: true })
-      )
+  if (null === ghUser) {
+    ghUser = await client.createWebspaceUser(
+      `github-action--${webspaceName}`,
+      core.getInput('ssh-public-key', { required: true })
     )
   }
+
+  users.push(ghUser)
 
   for (const user of additionalUsers) {
     const u = availUsers.find(x => x.name === user.displayName) ?? null
@@ -198,7 +204,13 @@ export async function findOrCreateWebspace(
       )
     }
 
-    return { webspace, isNew: false }
+    const webspaceAccess =
+      webspace.accesses.find(a => (ghUser.id = a.userId)) ?? null
+    if (null === webspaceAccess) {
+      throw new Error(`Unexpected error`)
+    }
+
+    return { webspace, webspaceAccess, isNew: false }
   }
 
   core.info('Creating a new webspace...')
@@ -225,7 +237,13 @@ export async function findOrCreateWebspace(
     }
   } while ('active' !== webspace.status)
 
-  return { webspace, isNew: true }
+  const webspaceAccess =
+    webspace.accesses.find(a => (ghUser.id = a.userId)) ?? null
+  if (null === webspaceAccess) {
+    throw new Error(`Unexpected error`)
+  }
+
+  return { webspace, webspaceAccess, isNew: true }
 }
 
 export async function getWebspaceAccess(
