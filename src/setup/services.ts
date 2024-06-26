@@ -3,13 +3,15 @@ import * as core from '@actions/core'
 import process from 'node:process'
 import { wait } from '../wait'
 import * as _ from 'lodash'
+import crypto from 'crypto'
 import { Manifest, ManifestApp, ManifestAppWeb } from '../config'
 import {
   DatabaseResult,
   transformCronJob,
   VhostResult,
   WebspaceAccess,
-  WebspaceResult
+  WebspaceResult,
+  UserResult
 } from '../api-client'
 
 export async function getWebspace(
@@ -118,14 +120,63 @@ export async function findOrCreateWebspace(
   let webspace: WebspaceResult | null =
     await client.findOneWebspaceByName(webspaceName)
 
+  const additionalUsers = []
+  for (const [displayName, key] of Object.entries(app.users ?? [])) {
+    if (!key.startsWith('ssh-rsa ') || key.split(' ').length > 3) {
+      console.error(`SSH key under "${displayName} is not supported`)
+      continue
+    }
+
+    const fingerprint = crypto.createHash('sha512').update(key).digest('hex')
+    additionalUsers.push({
+      displayName: `${displayName} #${fingerprint.substring(0, 6)}#`,
+      key
+    })
+  }
+
+  const availUsers = await client.findUsersByName(
+    [`github-action--${webspaceName}`].concat(
+      additionalUsers.map(x => x.displayName)
+    )
+  )
+
+  const users: UserResult[] = []
+  if (
+    null === availUsers.find(u => u.name === `github-action--${webspaceName}`)
+  ) {
+    users.push(
+      await client.createWebspaceUser(
+        `github-action--${webspaceName}`,
+        core.getInput('ssh-public-key', { required: true })
+      )
+    )
+  }
+
+  for (const user of additionalUsers) {
+    const u = availUsers.find(x => x.name === user.displayName) ?? null
+    if (null !== u) {
+      users.push(u)
+    } else {
+      users.push(await client.createWebspaceUser(user.displayName, user.key))
+    }
+  }
+
   if (null !== webspace) {
     if (
+      // Cronjobs are unchanged
       _.isEqual(
         webspace.cronJobs,
         (app.cron ?? []).map(c => transformCronJob(c, phpv))
       ) &&
+      // Reids is unchanged
       redisEnabled === (webspace.redisEnabled ?? false) &&
-      webspace.storageQuota === (app.disk ?? 10240)
+      // Disk size is unchanged
+      webspace.storageQuota === (app.disk ?? 10240) &&
+      // Webspace users are unchanged
+      _.isEqual(
+        webspace.accesses.map(a => a.userId),
+        availUsers.map(u => u.id)
+      )
     ) {
       core.info(`Using webspace ${webspaceName} (${webspace.id})`)
     } else {
@@ -133,6 +184,7 @@ export async function findOrCreateWebspace(
 
       webspace = await client.updateWebspace(
         webspace,
+        users,
         phpv,
         app.cron,
         redisEnabled,
@@ -147,6 +199,7 @@ export async function findOrCreateWebspace(
 
   webspace = await client.createWebspace(
     webspaceName,
+    users,
     app.cron ?? [],
     phpv,
     app.pool ?? null,
@@ -172,7 +225,7 @@ export async function findOrCreateWebspace(
 export async function getWebspaceAccess(
   webspace: WebspaceResult
 ): Promise<WebspaceAccess> {
-  const availableUsers = await client.findWebspaceUsers()
+  const availableUsers = await client.findUsersByName('github-action--*')
   const webspaceAccess =
     webspace.accesses.find(a => availableUsers.find(u => u.id === a.userId)) ??
     null

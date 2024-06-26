@@ -30287,7 +30287,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.transformCronJob = exports.createDatabaseUser = exports.createWebspaceUser = exports.addDatabaseAccess = exports.createDatabase = exports.createVhost = exports.updateWebspace = exports.createWebspace = exports.findWebspaceUsers = exports.findDatabaseAccesses = exports.findDatabaseById = exports.findDatabases = exports.deleteDatabaseUserById = exports.truncateDatabaseById = exports.deleteDatabaseById = exports.deleteVhostById = exports.deleteWebspaceById = exports.findVhostByWebspace = exports.findWebspaceById = exports.findOneWebspaceByName = exports.findActiveWebspaces = void 0;
+exports.transformCronJob = exports.createDatabaseUser = exports.createWebspaceUser = exports.addDatabaseAccess = exports.createDatabase = exports.createVhost = exports.updateWebspace = exports.createWebspace = exports.findUsersByName = exports.findDatabaseAccesses = exports.findDatabaseById = exports.findDatabases = exports.deleteDatabaseUserById = exports.truncateDatabaseById = exports.deleteDatabaseById = exports.deleteVhostById = exports.deleteWebspaceById = exports.findVhostByWebspace = exports.findWebspaceById = exports.findOneWebspaceByName = exports.findActiveWebspaces = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
 const http_client_1 = __nccwpck_require__(6255);
@@ -30467,19 +30467,24 @@ async function findDatabaseAccesses(userName, databaseId) {
     return response.result?.response?.data ?? [];
 }
 exports.findDatabaseAccesses = findDatabaseAccesses;
-async function findWebspaceUsers() {
+async function findUsersByName(name) {
+    if (typeof name === 'string') {
+        name = [name];
+    }
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/usersFind`, {
         authToken: token,
         filter: {
-            field: 'userName',
-            value: 'github-action--*'
+            subFilterConnective: 'OR',
+            subFilter: name.map(q => ({
+                field: 'userName',
+                value: q
+            }))
         }
     });
     return response.result?.response?.data ?? [];
 }
-exports.findWebspaceUsers = findWebspaceUsers;
-async function createWebspace(name, cronjobs, phpVersion, poolId = null, accountId = null, redisEnabled = false, disk = 10240) {
-    const user = await createWebspaceUser(name);
+exports.findUsersByName = findUsersByName;
+async function createWebspace(name, users, cronjobs, phpVersion, poolId = null, accountId = null, redisEnabled = false, disk = 10240) {
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/webspaceCreate`, {
         poolId,
         authToken: token,
@@ -30492,12 +30497,10 @@ async function createWebspace(name, cronjobs, phpVersion, poolId = null, account
             redisEnabled,
             storageQuota: disk
         },
-        accesses: [
-            {
-                userId: user.id,
-                sshAccess: true
-            }
-        ]
+        accesses: users.map(u => ({
+            userId: u.id,
+            sshAccess: true
+        }))
     });
     if (null === response.result) {
         throw new Error('Unexpected error');
@@ -30508,9 +30511,12 @@ async function createWebspace(name, cronjobs, phpVersion, poolId = null, account
     return response.result.response;
 }
 exports.createWebspace = createWebspace;
-async function updateWebspace(originalWebspace, phpVersion, cronjobs = null, redisEnabled = false, disk = 10240) {
+async function updateWebspace(originalWebspace, users, phpVersion, cronjobs = null, redisEnabled = false, disk = 10240) {
     const webspace = originalWebspace;
-    const accesses = originalWebspace.accesses;
+    const accesses = users.map(u => ({
+        userId: u.id,
+        sshAccess: true
+    }));
     if (null !== cronjobs) {
         webspace.cronJobs = cronjobs.map(c => transformCronJob(c, phpVersion));
     }
@@ -30644,14 +30650,13 @@ async function addDatabaseAccess(database, dbUser) {
     };
 }
 exports.addDatabaseAccess = addDatabaseAccess;
-async function createWebspaceUser(webspaceName) {
-    const sshKey = core.getInput('ssh-public-key', { required: true });
+async function createWebspaceUser(name, sshKey) {
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/userCreate`, {
         authToken: token,
         user: {
             sshKey,
-            name: `github-action--${webspaceName}`,
-            comment: 'Created by github action. Please do not remove.'
+            name,
+            comment: 'Created by github action. Please do not modify.'
         },
         password: crypto_1.default.randomUUID()
     });

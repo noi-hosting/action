@@ -48,6 +48,9 @@ interface ManifestApp {
   disk?: number
   sync?: string[]
   cron?: CronjobConfig[]
+  users?: {
+    [displayName: string]: string
+  }
 }
 
 interface ManifestAppWeb {

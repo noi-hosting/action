@@ -214,13 +214,22 @@ export async function findDatabaseAccesses(
   return response.result?.response?.data ?? []
 }
 
-export async function findWebspaceUsers(): Promise<WebspaceUserResult[]> {
+export async function findUsersByName(
+  name: string | string[]
+): Promise<WebspaceUserResult[]> {
+  if (typeof name === 'string') {
+    name = [name]
+  }
+
   const response: TypedResponse<ApiFindResponse<WebspaceUserResult>> =
     await _http.postJson(`${baseUri}/webhosting/v1/json/usersFind`, {
       authToken: token,
       filter: {
-        field: 'userName',
-        value: 'github-action--*'
+        subFilterConnective: 'OR',
+        subFilter: name.map(q => ({
+          field: 'userName',
+          value: q
+        }))
       }
     })
 
@@ -229,6 +238,7 @@ export async function findWebspaceUsers(): Promise<WebspaceUserResult[]> {
 
 export async function createWebspace(
   name: string,
+  users: UserResult[],
   cronjobs: CronjobConfig[],
   phpVersion: string | null,
   poolId: string | null = null,
@@ -236,8 +246,6 @@ export async function createWebspace(
   redisEnabled = false,
   disk = 10240
 ): Promise<WebspaceResult> {
-  const user = await createWebspaceUser(name)
-
   const response: TypedResponse<ApiActionResponse<WebspaceResult>> =
     await _http.postJson(`${baseUri}/webhosting/v1/json/webspaceCreate`, {
       poolId,
@@ -251,12 +259,10 @@ export async function createWebspace(
         redisEnabled,
         storageQuota: disk
       },
-      accesses: [
-        {
-          userId: user.id,
-          sshAccess: true
-        }
-      ]
+      accesses: users.map(u => ({
+        userId: u.id,
+        sshAccess: true
+      }))
     })
 
   if (null === response.result) {
@@ -272,13 +278,17 @@ export async function createWebspace(
 
 export async function updateWebspace(
   originalWebspace: WebspaceResult,
+  users: UserResult[],
   phpVersion: string | null,
   cronjobs: CronjobConfig[] | null = null,
   redisEnabled = false,
   disk = 10240
 ): Promise<WebspaceResult> {
   const webspace = originalWebspace
-  const accesses = originalWebspace.accesses
+  const accesses = users.map(u => ({
+    userId: u.id,
+    sshAccess: true
+  }))
 
   if (null !== cronjobs) {
     webspace.cronJobs = cronjobs.map(c => transformCronJob(c, phpVersion))
@@ -462,17 +472,16 @@ export async function addDatabaseAccess(
 }
 
 export async function createWebspaceUser(
-  webspaceName: string
+  name: string,
+  sshKey: string
 ): Promise<WebspaceUserResult> {
-  const sshKey: string = core.getInput('ssh-public-key', { required: true })
-
   const response: TypedResponse<ApiActionResponse<WebspaceUserResult>> =
     await _http.postJson(`${baseUri}/webhosting/v1/json/userCreate`, {
       authToken: token,
       user: {
         sshKey,
-        name: `github-action--${webspaceName}`,
-        comment: 'Created by github action. Please do not remove.'
+        name,
+        comment: 'Created by github action. Please do not modify.'
       },
       password: crypto.randomUUID()
     })
@@ -733,4 +742,10 @@ interface DatabaseResult {
   limitations: string[]
 }
 
-export { VhostResult, WebspaceAccess, WebspaceResult, DatabaseResult }
+export {
+  VhostResult,
+  WebspaceAccess,
+  WebspaceResult,
+  DatabaseResult,
+  UserResult
+}
