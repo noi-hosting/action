@@ -46707,7 +46707,7 @@ function transformCronJob(config, phpVersion) {
         cronjob.type = 'php';
         cronjob.script = script;
         cronjob.parameters = parameters;
-        cronjob.interpreterVersion = phpVersion ?? '';
+        cronjob.interpreterVersion = phpVersion;
     }
     else if (config.cmd !== undefined && config.cmd !== null) {
         const [script, ...parameters] = config.cmd.split(' ');
@@ -46958,7 +46958,10 @@ async function applyDatabases(databasePrefix, appKey, app, manifest) {
 }
 exports.applyDatabases = applyDatabases;
 async function findOrCreateWebspace(webspaceName, app) {
-    const phpv = app.php?.version ?? node_process_1.default.env.PHP_VERSION ?? null;
+    const phpv = app.php.version ?? '';
+    if ('' === phpv) {
+        throw new Error(`Please specify "app.<APP_NAME>.php.version`);
+    }
     const redisEnabled = Object.values(app.relationships ?? {}).includes('redis');
     let webspace = await client.findOneWebspaceByName(webspaceName);
     const additionalUsers = [];

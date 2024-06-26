@@ -30721,7 +30721,7 @@ function transformCronJob(config, phpVersion) {
         cronjob.type = 'php';
         cronjob.script = script;
         cronjob.parameters = parameters;
-        cronjob.interpreterVersion = phpVersion ?? '';
+        cronjob.interpreterVersion = phpVersion;
     }
     else if (config.cmd !== undefined && config.cmd !== null) {
         const [script, ...parameters] = config.cmd.split(' ');

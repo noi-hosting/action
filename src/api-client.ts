@@ -240,7 +240,7 @@ export async function createWebspace(
   name: string,
   users: UserResult[],
   cronjobs: CronjobConfig[],
-  phpVersion: string | null,
+  phpVersion: string,
   poolId: string | null = null,
   accountId: string | null = null,
   redisEnabled = false,
@@ -279,7 +279,7 @@ export async function createWebspace(
 export async function updateWebspace(
   originalWebspace: WebspaceResult,
   users: UserResult[],
-  phpVersion: string | null,
+  phpVersion: string,
   cronjobs: CronjobConfig[] | null = null,
   redisEnabled = false,
   disk = 10240
@@ -547,7 +547,7 @@ function transformPhpIni(
 
 export function transformCronJob(
   config: CronjobConfig,
-  phpVersion: string | null
+  phpVersion: string
 ): CronJob {
   // Use default values so that _.isEqual comparison works
   const cronjob = {
@@ -571,7 +571,7 @@ export function transformCronJob(
     cronjob.type = 'php'
     cronjob.script = script
     cronjob.parameters = parameters
-    cronjob.interpreterVersion = phpVersion ?? ''
+    cronjob.interpreterVersion = phpVersion
   } else if (config.cmd !== undefined && config.cmd !== null) {
     const [script, ...parameters] = config.cmd.split(' ')
 

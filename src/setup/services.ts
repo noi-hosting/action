@@ -127,7 +127,11 @@ export async function findOrCreateWebspace(
   webspaceAccess: WebspaceAccess
   isNew: boolean
 }> {
-  const phpv = app.php?.version ?? process.env.PHP_VERSION ?? null
+  const phpv = app.php.version ?? ''
+  if ('' === phpv) {
+    throw new Error(`Please specify "app.<APP_NAME>.php.version`)
+  }
+
   const redisEnabled = Object.values(app.relationships ?? {}).includes('redis')
   let webspace: WebspaceResult | null =
     await client.findOneWebspaceByName(webspaceName)
