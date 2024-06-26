@@ -109,6 +109,7 @@ runs:
       shell: bash
       run: |
         ssh -l "${{ steps.hosting.outputs.ssh-user }}" -p "${{ steps.hosting.outputs.ssh-port }}" "${{ steps.hosting.outputs.ssh-host }}" -o StrictHostKeyChecking=no "[ ! -L ${{ steps.hosting.outputs.deploy-path }}/current ] && [ -d ${{ steps.hosting.outputs.deploy-path }}/current ] && rm -r ${{ steps.hosting.outputs.deploy-path }}/current || true"
+        ssh -l "${{ steps.hosting.outputs.ssh-user }}" -p "${{ steps.hosting.outputs.ssh-port }}" "${{ steps.hosting.outputs.ssh-host }}" -o StrictHostKeyChecking=no "echo 'PHPBIN=/opt/php-${{ steps.hosting.outputs.php-version }}/bin/php' > /home/${{ steps.hosting.outputs.http-user }}/.phpcfg"
 
     # Write both user-provided and environment-provided environment variables to the remote host
     - name: Put environment variables
@@ -144,7 +145,6 @@ runs:
           hostname=${{ steps.hosting.outputs.ssh-host }} -o port=${{
           steps.hosting.outputs.ssh-port }} -o http_user=${{
           steps.hosting.outputs.http-user }} -o deploy_path=${{
-          steps.hosting.outputs.deploy-path }} -o bin/php=php-${{
-          steps.hosting.outputs.php-version }} -o web_url=${{
+          steps.hosting.outputs.deploy-path }} -o web_url=${{
           steps.hosting.outputs.public-url }}
         private-key: ${{ inputs.ssh-private-key }}
