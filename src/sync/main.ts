@@ -90,11 +90,14 @@ export async function run(): Promise<void> {
         dbQueries.push(`${projectPrefix}-${toEnv}-*`)
       }
     } else if (null !== app) {
-      for (const relationName of Object.values(app.databases ?? {}).filter(
-        d => d.length === 0 || syncDatabases.includes(d)
+      for (const dbName of Object.values(app.relationships ?? {}).filter(
+        d =>
+          'database' === d.split(':')[0] &&
+          (syncDatabases.length === 0 ||
+            syncDatabases.includes(d.split(':')[1] ?? appKey))
       )) {
-        dbQueries.push(`${projectPrefix}-${fromEnv}-${relationName}`)
-        dbQueries.push(`${projectPrefix}-${toEnv}-${relationName}`)
+        dbQueries.push(`${projectPrefix}-${fromEnv}-${dbName}`)
+        dbQueries.push(`${projectPrefix}-${toEnv}-${dbName}`)
       }
     } else {
       throw new Error(

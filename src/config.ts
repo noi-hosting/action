@@ -24,6 +24,12 @@ interface Manifest {
   applications: {
     [app: string]: ManifestApp
   }
+  databases?: {
+    schemas: string[]
+    endpoints: {
+      [endpoint: string]: string // 'schema:privileges' or 'schema'
+    }
+  }
 }
 
 interface ManifestApp {
@@ -39,7 +45,7 @@ interface ManifestApp {
   env?: {
     [key: string]: string | boolean | number
   }
-  databases?: {
+  relationships?: {
     [key: string]: string
   }
   web: {

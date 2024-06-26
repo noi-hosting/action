@@ -28,17 +28,24 @@ export async function getWebspace(
   const { webspace, isNew } = await findOrCreateWebspace(webspaceName, app)
   const webspaceAccess = await getWebspaceAccess(webspace)
 
+  const envVars: { [key: string]: string | boolean | number } = {}
+
+  const redisRelationName =
+    Object.keys(app.relationships ?? {}).find(
+      key => 'redis' === (app.relationships ?? {})[key]
+    ) ?? null
+  if (null !== redisRelationName) {
+    envVars[`${redisRelationName.replace('-', '_').toUpperCase()}`] =
+      `redis:///run/redis-${webspace.webspaceName}/sock`
+  }
+
   return {
     webspace,
     isNew,
     sshUser: webspaceAccess.userName ?? '',
     sshHost: webspace.hostName,
     httpUser: webspace.webspaceName,
-    envVars: {
-      REDIS_URL: webspace.redisEnabled
-        ? `redis:///run/redis-${webspace.webspaceName}/sock`
-        : ''
-    }
+    envVars
   }
 }
 
@@ -115,8 +122,7 @@ export async function findOrCreateWebspace(
   app: ManifestApp
 ): Promise<{ webspace: WebspaceResult; isNew: boolean }> {
   const phpv = app.php?.version ?? process.env.PHP_VERSION ?? null
-  const redisEnabled =
-    app.php?.extensions !== undefined && app.php.extensions.includes('redis')
+  const redisEnabled = Object.values(app.relationships ?? {}).includes('redis')
   let webspace: WebspaceResult | null =
     await client.findOneWebspaceByName(webspaceName)
 
@@ -304,9 +310,13 @@ export async function configureDatabases(
   envVars: object
 ): Promise<{ newDatabases: string[] }> {
   const newDatabases = []
-  for (const [relationName, databaseName] of Object.entries(
-    app.databases ?? {}
-  )) {
+  for (const [relationName, relation] of Object.entries(
+    app.relationships ?? {}
+  ).filter(([, v]) => v.split(':')[0] === 'database')) {
+    const entrypoint = relation.split(':')[1] ?? appKey
+
+    const databaseName = entrypoint // fixme lookup
+
     const databaseInternalName = `${databasePrefix}-${databaseName.toLowerCase()}`
     const dbUserName = `${databasePrefix}-${appKey}--${relationName.toLowerCase()}`
 
@@ -406,10 +416,7 @@ export async function pruneDatabases(
   databasePrefix: string,
   foundDatabases: DatabaseResult[]
 ): Promise<void> {
-  const allDatabaseNames = Object.values(manifest.applications).reduce(
-    (dbNames, a) => dbNames.concat(Object.values(a.databases ?? {})),
-    [] as string[]
-  )
+  const allDatabaseNames = manifest.databases?.schemas ?? []
   for (const relict of foundDatabases.filter(
     v =>
       !allDatabaseNames

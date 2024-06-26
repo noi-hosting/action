@@ -46918,17 +46918,19 @@ const api_client_1 = __nccwpck_require__(5707);
 async function getWebspace(webspaceName, app) {
     const { webspace, isNew } = await findOrCreateWebspace(webspaceName, app);
     const webspaceAccess = await getWebspaceAccess(webspace);
+    const envVars = {};
+    const redisRelationName = Object.keys(app.relationships ?? {}).find(key => 'redis' === (app.relationships ?? {})[key]) ?? null;
+    if (null !== redisRelationName) {
+        envVars[`${redisRelationName.replace('-', '_').toUpperCase()}`] =
+            `redis:///run/redis-${webspace.webspaceName}/sock`;
+    }
     return {
         webspace,
         isNew,
         sshUser: webspaceAccess.userName ?? '',
         sshHost: webspace.hostName,
         httpUser: webspace.webspaceName,
-        envVars: {
-            REDIS_URL: webspace.redisEnabled
-                ? `redis:///run/redis-${webspace.webspaceName}/sock`
-                : ''
-        }
+        envVars
     };
 }
 exports.getWebspace = getWebspace;
@@ -46958,7 +46960,7 @@ async function applyDatabases(databasePrefix, appKey, app, manifest) {
 exports.applyDatabases = applyDatabases;
 async function findOrCreateWebspace(webspaceName, app) {
     const phpv = app.php?.version ?? node_process_1.default.env.PHP_VERSION ?? null;
-    const redisEnabled = app.php?.extensions !== undefined && app.php.extensions.includes('redis');
+    const redisEnabled = Object.values(app.relationships ?? {}).includes('redis');
     let webspace = await client.findOneWebspaceByName(webspaceName);
     const additionalUsers = [];
     for (const [displayName, key] of Object.entries(app.users ?? [])) {
@@ -47052,7 +47054,9 @@ async function pruneVhosts(foundVhosts, app, ref, manifest, appKey) {
 exports.pruneVhosts = pruneVhosts;
 async function configureDatabases(app, databasePrefix, appKey, foundDatabases, envVars) {
     const newDatabases = [];
-    for (const [relationName, databaseName] of Object.entries(app.databases ?? {})) {
+    for (const [relationName, relation] of Object.entries(app.relationships ?? {}).filter(([, v]) => v.split(':')[0] === 'database')) {
+        const entrypoint = relation.split(':')[1] ?? appKey;
+        const databaseName = entrypoint; // fixme lookup
         const databaseInternalName = `${databasePrefix}-${databaseName.toLowerCase()}`;
         const dbUserName = `${databasePrefix}-${appKey}--${relationName.toLowerCase()}`;
         core.info(`Processing database "${databaseName}" for relation "${relationName}"`);
@@ -47106,7 +47110,7 @@ function defineEnv(envVars, relationName, database, databaseUserName, databasePa
     core.setSecret(databasePassword);
 }
 async function pruneDatabases(manifest, databasePrefix, foundDatabases) {
-    const allDatabaseNames = Object.values(manifest.applications).reduce((dbNames, a) => dbNames.concat(Object.values(a.databases ?? {})), []);
+    const allDatabaseNames = manifest.databases?.schemas ?? [];
     for (const relict of foundDatabases.filter(v => !allDatabaseNames
         .map(n => `${databasePrefix}-${n.toLowerCase()}`)
         .includes(v.name))) {
