@@ -435,16 +435,30 @@ export async function createDatabase(
 
 export async function addDatabaseAccess(
   database: DatabaseResult,
-  dbUser: DatabaseUserResult
+  dbUser: DatabaseUserResult,
+  privileges = ''
 ): Promise<{
   database: DatabaseResult
   dbLogin: string
 }> {
+  let accessLevel
+  switch (privileges) {
+    case 'ro':
+      accessLevel = ['read']
+      break
+    case 'rw':
+      accessLevel = ['read', 'write']
+      break
+    case 'admin':
+    default:
+      accessLevel = ['read', 'write', 'schema']
+  }
+
   const accesses = database.accesses
   accesses.push({
     userId: dbUser.id,
     databaseId: database.id,
-    accessLevel: ['read', 'write', 'schema']
+    accessLevel
   })
 
   const response: TypedResponse<ApiActionResponse<DatabaseResult>> =

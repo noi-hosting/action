@@ -46606,12 +46606,24 @@ async function createDatabase(dbUserName, databaseName, poolId = null, accountId
     };
 }
 exports.createDatabase = createDatabase;
-async function addDatabaseAccess(database, dbUser) {
+async function addDatabaseAccess(database, dbUser, privileges = '') {
+    let accessLevel;
+    switch (privileges) {
+        case 'ro':
+            accessLevel = ['read'];
+            break;
+        case 'rw':
+            accessLevel = ['read', 'write'];
+            break;
+        case 'admin':
+        default:
+            accessLevel = ['read', 'write', 'schema'];
+    }
     const accesses = database.accesses;
     accesses.push({
         userId: dbUser.id,
         databaseId: database.id,
-        accessLevel: ['read', 'write', 'schema']
+        accessLevel
     });
     const response = await _http.postJson(`${baseUri}/database/v1/json/databaseUpdate`, {
         authToken: token,
@@ -46920,7 +46932,7 @@ async function getWebspace(webspaceName, app) {
     const envVars = {};
     const redisRelationName = Object.keys(app.relationships ?? {}).find(key => 'redis' === (app.relationships ?? {})[key]) ?? null;
     if (null !== redisRelationName) {
-        envVars[`${redisRelationName.replace('-', '_').toUpperCase()}`] =
+        envVars[`${redisRelationName.replace('-', '_').toUpperCase()}_URL`] =
             `redis:///run/redis-${webspace.webspaceName}/sock`;
     }
     return {
@@ -46952,7 +46964,7 @@ exports.applyVhosts = applyVhosts;
 async function applyDatabases(databasePrefix, appKey, app, manifest) {
     const envVars = {};
     const foundDatabases = await client.findDatabases(`${databasePrefix}-*`);
-    const { newDatabases } = await configureDatabases(app, databasePrefix, appKey, foundDatabases, envVars);
+    const { newDatabases } = await configureDatabases(manifest, app, databasePrefix, appKey, foundDatabases, envVars);
     await pruneDatabases(manifest, databasePrefix, foundDatabases);
     return { newDatabases, envVars };
 }
@@ -47064,14 +47076,21 @@ async function pruneVhosts(foundVhosts, app, ref, manifest, appKey) {
     }
 }
 exports.pruneVhosts = pruneVhosts;
-async function configureDatabases(app, databasePrefix, appKey, foundDatabases, envVars) {
+async function configureDatabases(manifest, app, databasePrefix, appKey, foundDatabases, envVars) {
     const newDatabases = [];
     for (const [relationName, relation] of Object.entries(app.relationships ?? {}).filter(([, v]) => v.split(':')[0] === 'database')) {
-        const entrypoint = relation.split(':')[1] ?? appKey;
-        const databaseName = entrypoint; // fixme lookup
-        const databaseInternalName = `${databasePrefix}-${databaseName.toLowerCase()}`;
-        const dbUserName = `${databasePrefix}-${appKey}--${relationName.toLowerCase()}`;
-        core.info(`Processing database "${databaseName}" for relation "${relationName}"`);
+        const endpointName = relation.split(':')[1] ?? appKey;
+        const endpoint = manifest.databases?.endpoints[endpointName] ?? null;
+        if (null === endpoint) {
+            throw new Error(`Could not find "databases.endpoint.${endpointName}"`);
+        }
+        const [schema, privileges] = endpoint.split(':');
+        if (!(manifest.databases?.schemas ?? []).includes(schema)) {
+            throw new Error(`Could not find schema "${schema}" under "databases.schemas"`);
+        }
+        const databaseInternalName = `${databasePrefix}-${schema.toLowerCase()}`;
+        const dbUserName = `${databasePrefix}-${endpointName.toLowerCase()}--${appKey}`;
+        core.info(`Processing database "${schema}" for relation "${relationName}"`);
         const existingDatabase = foundDatabases.find(d => d.name === databaseInternalName) ?? null;
         if (null !== existingDatabase) {
             const usersWithAccess = await client.findDatabaseAccesses(dbUserName, existingDatabase.id);
@@ -47081,7 +47100,7 @@ async function configureDatabases(app, databasePrefix, appKey, foundDatabases, e
             else {
                 core.info(`Granting access on database ${databaseInternalName}`);
                 const { user: dbUser, password: databasePassword } = await client.createDatabaseUser(dbUserName, app.account ?? null);
-                const { database, dbLogin } = await client.addDatabaseAccess(existingDatabase, dbUser);
+                const { database, dbLogin } = await client.addDatabaseAccess(existingDatabase, dbUser, privileges ?? '');
                 defineEnv(envVars, relationName, database, dbLogin, databasePassword);
             }
         }
@@ -47097,7 +47116,7 @@ async function configureDatabases(app, databasePrefix, appKey, foundDatabases, e
                     throw new Error(`Unexpected error.`);
                 }
             } while ('active' !== database.status);
-            newDatabases.push(databaseName);
+            newDatabases.push(schema);
             defineEnv(envVars, relationName, database, databaseUserName, databasePassword);
         }
     }

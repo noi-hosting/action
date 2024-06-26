@@ -30620,12 +30620,24 @@ async function createDatabase(dbUserName, databaseName, poolId = null, accountId
     };
 }
 exports.createDatabase = createDatabase;
-async function addDatabaseAccess(database, dbUser) {
+async function addDatabaseAccess(database, dbUser, privileges = '') {
+    let accessLevel;
+    switch (privileges) {
+        case 'ro':
+            accessLevel = ['read'];
+            break;
+        case 'rw':
+            accessLevel = ['read', 'write'];
+            break;
+        case 'admin':
+        default:
+            accessLevel = ['read', 'write', 'schema'];
+    }
     const accesses = database.accesses;
     accesses.push({
         userId: dbUser.id,
         databaseId: database.id,
-        accessLevel: ['read', 'write', 'schema']
+        accessLevel
     });
     const response = await _http.postJson(`${baseUri}/database/v1/json/databaseUpdate`, {
         authToken: token,

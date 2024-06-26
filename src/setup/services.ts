@@ -37,7 +37,7 @@ export async function getWebspace(
       key => 'redis' === (app.relationships ?? {})[key]
     ) ?? null
   if (null !== redisRelationName) {
-    envVars[`${redisRelationName.replace('-', '_').toUpperCase()}`] =
+    envVars[`${redisRelationName.replace('-', '_').toUpperCase()}_URL`] =
       `redis:///run/redis-${webspace.webspaceName}/sock`
   }
 
@@ -108,6 +108,7 @@ export async function applyDatabases(
   const foundDatabases = await client.findDatabases(`${databasePrefix}-*`)
 
   const { newDatabases } = await configureDatabases(
+    manifest,
     app,
     databasePrefix,
     appKey,
@@ -325,6 +326,7 @@ export async function pruneVhosts(
 }
 
 export async function configureDatabases(
+  manifest: Manifest,
   app: ManifestApp,
   databasePrefix: string,
   appKey: string,
@@ -335,16 +337,22 @@ export async function configureDatabases(
   for (const [relationName, relation] of Object.entries(
     app.relationships ?? {}
   ).filter(([, v]) => v.split(':')[0] === 'database')) {
-    const entrypoint = relation.split(':')[1] ?? appKey
+    const endpointName = relation.split(':')[1] ?? appKey
+    const endpoint = manifest.databases?.endpoints[endpointName] ?? null
+    if (null === endpoint) {
+      throw new Error(`Could not find "databases.endpoint.${endpointName}"`)
+    }
+    const [schema, privileges] = endpoint.split(':')
+    if (!(manifest.databases?.schemas ?? []).includes(schema)) {
+      throw new Error(
+        `Could not find schema "${schema}" under "databases.schemas"`
+      )
+    }
 
-    const databaseName = entrypoint // fixme lookup
+    const databaseInternalName = `${databasePrefix}-${schema.toLowerCase()}`
+    const dbUserName = `${databasePrefix}-${endpointName.toLowerCase()}--${appKey}`
 
-    const databaseInternalName = `${databasePrefix}-${databaseName.toLowerCase()}`
-    const dbUserName = `${databasePrefix}-${appKey}--${relationName.toLowerCase()}`
-
-    core.info(
-      `Processing database "${databaseName}" for relation "${relationName}"`
-    )
+    core.info(`Processing database "${schema}" for relation "${relationName}"`)
 
     const existingDatabase =
       foundDatabases.find(d => d.name === databaseInternalName) ?? null
@@ -362,7 +370,8 @@ export async function configureDatabases(
           await client.createDatabaseUser(dbUserName, app.account ?? null)
         const { database, dbLogin } = await client.addDatabaseAccess(
           existingDatabase,
-          dbUser
+          dbUser,
+          privileges ?? ''
         )
 
         defineEnv(envVars, relationName, database, dbLogin, databasePassword)
@@ -390,7 +399,7 @@ export async function configureDatabases(
         }
       } while ('active' !== database.status)
 
-      newDatabases.push(databaseName)
+      newDatabases.push(schema)
 
       defineEnv(
         envVars,
