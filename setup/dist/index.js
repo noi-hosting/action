@@ -46958,7 +46958,7 @@ async function applyDatabases(databasePrefix, appKey, app, manifest) {
 }
 exports.applyDatabases = applyDatabases;
 async function findOrCreateWebspace(webspaceName, app) {
-    const phpv = app.php.version ?? '';
+    const phpv = `${app.php.version ?? ''}`;
     if ('' === phpv) {
         throw new Error(`Please specify "app.<APP_NAME>.php.version`);
     }

@@ -127,7 +127,7 @@ export async function findOrCreateWebspace(
   webspaceAccess: WebspaceAccess
   isNew: boolean
 }> {
-  const phpv = app.php.version ?? ''
+  const phpv = `${app.php.version ?? ''}`
   if ('' === phpv) {
     throw new Error(`Please specify "app.<APP_NAME>.php.version`)
   }
