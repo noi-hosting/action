@@ -30513,10 +30513,13 @@ async function createWebspace(name, users, cronjobs, phpVersion, poolId = null, 
 exports.createWebspace = createWebspace;
 async function updateWebspace(originalWebspace, users, phpVersion, cronjobs = null, redisEnabled = false, disk = 10240) {
     const webspace = originalWebspace;
-    const accesses = users.map(u => ({
+    const existingUserIds = originalWebspace.accesses.map(a => a.userId);
+    const accesses = originalWebspace.accesses.concat(users
+        .filter(u => !existingUserIds.includes(u.id))
+        .map((u) => ({
         userId: u.id,
         sshAccess: true
-    }));
+    })));
     if (null !== cronjobs) {
         webspace.cronJobs = cronjobs.map(c => transformCronJob(c, phpVersion));
     }

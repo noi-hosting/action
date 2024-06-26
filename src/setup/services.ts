@@ -31,7 +31,7 @@ export async function getWebspace(
   return {
     webspace,
     isNew,
-    sshUser: webspaceAccess.userName,
+    sshUser: webspaceAccess.userName ?? '',
     sshHost: webspace.hostName,
     httpUser: webspace.webspaceName,
     envVars: {
@@ -168,10 +168,10 @@ export async function findOrCreateWebspace(
         webspace.cronJobs,
         (app.cron ?? []).map(c => transformCronJob(c, phpv))
       ) &&
-      // Reids is unchanged
-      redisEnabled === (webspace.redisEnabled ?? false) &&
+      // Redis is unchanged
+      _.isEqual(redisEnabled, webspace.redisEnabled ?? false) &&
       // Disk size is unchanged
-      webspace.storageQuota === (app.disk ?? 10240) &&
+      _.isEqual(webspace.storageQuota, app.disk ?? 10240) &&
       // Webspace users are unchanged
       _.isEqual(
         webspace.accesses.map(a => a.userId),

@@ -285,10 +285,17 @@ export async function updateWebspace(
   disk = 10240
 ): Promise<WebspaceResult> {
   const webspace = originalWebspace
-  const accesses = users.map(u => ({
-    userId: u.id,
-    sshAccess: true
-  }))
+  const existingUserIds = originalWebspace.accesses.map(a => a.userId)
+  const accesses = originalWebspace.accesses.concat(
+    users
+      .filter(u => !existingUserIds.includes(u.id))
+      .map(
+        (u): WebspaceAccess => ({
+          userId: u.id,
+          sshAccess: true
+        })
+      )
+  )
 
   if (null !== cronjobs) {
     webspace.cronJobs = cronjobs.map(c => transformCronJob(c, phpVersion))
@@ -629,14 +636,14 @@ interface ApiActionResponse<T> extends ApiResponse {
 }
 
 interface WebspaceAccess {
-  addDate: string
-  ftpAccess: boolean
-  lastChangeDate: string
-  sshAccess: boolean
-  statsAccess: boolean
+  addDate?: string
+  ftpAccess?: boolean
+  lastChangeDate?: string
+  sshAccess?: boolean
+  statsAccess?: boolean
   userId: string
-  userName: string
-  webspaceId: string
+  userName?: string
+  webspaceId?: string
 }
 
 interface DatabaseAccess {

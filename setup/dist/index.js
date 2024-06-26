@@ -46499,10 +46499,13 @@ async function createWebspace(name, users, cronjobs, phpVersion, poolId = null, 
 exports.createWebspace = createWebspace;
 async function updateWebspace(originalWebspace, users, phpVersion, cronjobs = null, redisEnabled = false, disk = 10240) {
     const webspace = originalWebspace;
-    const accesses = users.map(u => ({
+    const existingUserIds = originalWebspace.accesses.map(a => a.userId);
+    const accesses = originalWebspace.accesses.concat(users
+        .filter(u => !existingUserIds.includes(u.id))
+        .map((u) => ({
         userId: u.id,
         sshAccess: true
-    }));
+    })));
     if (null !== cronjobs) {
         webspace.cronJobs = cronjobs.map(c => transformCronJob(c, phpVersion));
     }
@@ -46918,7 +46921,7 @@ async function getWebspace(webspaceName, app) {
     return {
         webspace,
         isNew,
-        sshUser: webspaceAccess.userName,
+        sshUser: webspaceAccess.userName ?? '',
         sshHost: webspace.hostName,
         httpUser: webspace.webspaceName,
         envVars: {
@@ -46987,10 +46990,10 @@ async function findOrCreateWebspace(webspaceName, app) {
         if (
         // Cronjobs are unchanged
         _.isEqual(webspace.cronJobs, (app.cron ?? []).map(c => (0, api_client_1.transformCronJob)(c, phpv))) &&
-            // Reids is unchanged
-            redisEnabled === (webspace.redisEnabled ?? false) &&
+            // Redis is unchanged
+            _.isEqual(redisEnabled, webspace.redisEnabled ?? false) &&
             // Disk size is unchanged
-            webspace.storageQuota === (app.disk ?? 10240) &&
+            _.isEqual(webspace.storageQuota, app.disk ?? 10240) &&
             // Webspace users are unchanged
             _.isEqual(webspace.accesses.map(a => a.userId), availUsers.map(u => u.id))) {
             core.info(`Using webspace ${webspaceName} (${webspace.id})`);
