@@ -11,7 +11,8 @@ import {
   VhostResult,
   WebspaceAccess,
   WebspaceResult,
-  UserResult
+  UserResult,
+  getAccesses
 } from '../api-client'
 
 export async function getWebspace(
@@ -363,6 +364,23 @@ export async function configureDatabases(
       )
       if (usersWithAccess.length) {
         core.info(`Database already in use (${databaseInternalName})`)
+
+        const access = existingDatabase.accesses.find(
+          a => a.userId === usersWithAccess[0].id
+        )
+        if (
+          (privileges ?? 'admin') !== getPrivileges(access?.accessLevel ?? [])
+        ) {
+          await client.updateDatabase(
+            existingDatabase,
+            existingDatabase.accesses.map(a => {
+              if (a.userId === usersWithAccess[0].id) {
+                a.accessLevel = getAccesses(privileges ?? 'admin')
+              }
+              return a
+            })
+          )
+        }
       } else {
         core.info(`Granting access on database ${databaseInternalName}`)
 
@@ -519,6 +537,24 @@ function translateDomainName(
   // }
 
   return domainName.replace(/\{app}/gi, app).replace(/\{ref}/gi, environment)
+}
+
+function getPrivileges(accessLevel: string[]): string {
+  if (
+    accessLevel.includes('read') &&
+    accessLevel.includes('write') &&
+    accessLevel.includes('schema')
+  ) {
+    return 'admin'
+  }
+  if (accessLevel.includes('read') && accessLevel.includes('write')) {
+    return 'rw'
+  }
+  if (accessLevel.includes('read')) {
+    return 'r'
+  }
+
+  throw new Error(`Access level "${JSON.stringify(accessLevel)}" unknown.`)
 }
 
 function mustBeUpdated(

@@ -46273,7 +46273,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.transformCronJob = exports.createDatabaseUser = exports.createWebspaceUser = exports.addDatabaseAccess = exports.createDatabase = exports.createVhost = exports.updateWebspace = exports.createWebspace = exports.findUsersByName = exports.findDatabaseAccesses = exports.findDatabaseById = exports.findDatabases = exports.deleteDatabaseUserById = exports.truncateDatabaseById = exports.deleteDatabaseById = exports.deleteVhostById = exports.deleteWebspaceById = exports.findVhostByWebspace = exports.findWebspaceById = exports.findOneWebspaceByName = exports.findActiveWebspaces = void 0;
+exports.transformCronJob = exports.createDatabaseUser = exports.createWebspaceUser = exports.addDatabaseAccess = exports.getAccesses = exports.createDatabase = exports.createVhost = exports.updateDatabase = exports.updateWebspace = exports.createWebspace = exports.findUsersByName = exports.findDatabaseAccesses = exports.findDatabaseById = exports.findDatabases = exports.deleteDatabaseUserById = exports.truncateDatabaseById = exports.deleteDatabaseById = exports.deleteVhostById = exports.deleteWebspaceById = exports.findVhostByWebspace = exports.findWebspaceById = exports.findOneWebspaceByName = exports.findActiveWebspaces = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
 const http_client_1 = __nccwpck_require__(6255);
@@ -46527,6 +46527,21 @@ async function updateWebspace(originalWebspace, users, phpVersion, cronjobs = nu
     return response.result.response;
 }
 exports.updateWebspace = updateWebspace;
+async function updateDatabase(database, accesses) {
+    const response = await _http.postJson(`${baseUri}/database/v1/json/databaseUpdate`, {
+        authToken: token,
+        database,
+        accesses: accesses ?? []
+    });
+    if (null === response.result) {
+        throw new Error('Unexpected error');
+    }
+    if ('error' === (response.result.status ?? null)) {
+        throw new Error(JSON.stringify(response.result.errors ?? []));
+    }
+    return response.result.response;
+}
+exports.updateDatabase = updateDatabase;
 async function createVhost(webspace, web, app, domainName, phpVersion) {
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/vhostCreate`, {
         authToken: token,
@@ -46606,9 +46621,9 @@ async function createDatabase(dbUserName, databaseName, poolId = null, accountId
     };
 }
 exports.createDatabase = createDatabase;
-async function addDatabaseAccess(database, dbUser, privileges = '') {
+function getAccesses(privilege) {
     let accessLevel;
-    switch (privileges) {
+    switch (privilege) {
         case 'ro':
             accessLevel = ['read'];
             break;
@@ -46619,11 +46634,15 @@ async function addDatabaseAccess(database, dbUser, privileges = '') {
         default:
             accessLevel = ['read', 'write', 'schema'];
     }
+    return accessLevel;
+}
+exports.getAccesses = getAccesses;
+async function addDatabaseAccess(database, dbUser, privileges = '') {
     const accesses = database.accesses;
     accesses.push({
         userId: dbUser.id,
         databaseId: database.id,
-        accessLevel
+        accessLevel: getAccesses(privileges)
     });
     const response = await _http.postJson(`${baseUri}/database/v1/json/databaseUpdate`, {
         authToken: token,
@@ -47096,6 +47115,15 @@ async function configureDatabases(manifest, app, databasePrefix, appKey, foundDa
             const usersWithAccess = await client.findDatabaseAccesses(dbUserName, existingDatabase.id);
             if (usersWithAccess.length) {
                 core.info(`Database already in use (${databaseInternalName})`);
+                const access = existingDatabase.accesses.find(a => a.userId === usersWithAccess[0].id);
+                if ((privileges ?? 'admin') !== getPrivileges(access?.accessLevel ?? [])) {
+                    await client.updateDatabase(existingDatabase, existingDatabase.accesses.map(a => {
+                        if (a.userId === usersWithAccess[0].id) {
+                            a.accessLevel = (0, api_client_1.getAccesses)(privileges ?? 'admin');
+                        }
+                        return a;
+                    }));
+                }
             }
             else {
                 core.info(`Granting access on database ${databaseInternalName}`);
@@ -47192,6 +47220,20 @@ function translateDomainName(domainName, environment, manifest, app) {
     //   return web.environments[environment]
     // }
     return domainName.replace(/\{app}/gi, app).replace(/\{ref}/gi, environment);
+}
+function getPrivileges(accessLevel) {
+    if (accessLevel.includes('read') &&
+        accessLevel.includes('write') &&
+        accessLevel.includes('schema')) {
+        return 'admin';
+    }
+    if (accessLevel.includes('read') && accessLevel.includes('write')) {
+        return 'rw';
+    }
+    if (accessLevel.includes('read')) {
+        return 'r';
+    }
+    throw new Error(`Access level "${JSON.stringify(accessLevel)}" unknown.`);
 }
 function mustBeUpdated(vhost, app, web) {
     const phpv = app.php?.version ?? node_process_1.default.env.PHP_VERSION ?? null;

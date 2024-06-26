@@ -325,6 +325,28 @@ export async function updateWebspace(
   return response.result.response
 }
 
+export async function updateDatabase(
+  database: DatabaseResult,
+  accesses: DatabaseAccess[]
+): Promise<DatabaseResult> {
+  const response: TypedResponse<ApiActionResponse<DatabaseResult>> =
+    await _http.postJson(`${baseUri}/database/v1/json/databaseUpdate`, {
+      authToken: token,
+      database,
+      accesses: accesses ?? []
+    })
+
+  if (null === response.result) {
+    throw new Error('Unexpected error')
+  }
+
+  if ('error' === (response.result.status ?? null)) {
+    throw new Error(JSON.stringify(response.result.errors ?? []))
+  }
+
+  return response.result.response
+}
+
 export async function createVhost(
   webspace: WebspaceResult,
   web: ManifestAppWeb,
@@ -433,16 +455,9 @@ export async function createDatabase(
   }
 }
 
-export async function addDatabaseAccess(
-  database: DatabaseResult,
-  dbUser: DatabaseUserResult,
-  privileges = ''
-): Promise<{
-  database: DatabaseResult
-  dbLogin: string
-}> {
+export function getAccesses(privilege: string): string[] {
   let accessLevel
-  switch (privileges) {
+  switch (privilege) {
     case 'ro':
       accessLevel = ['read']
       break
@@ -454,11 +469,22 @@ export async function addDatabaseAccess(
       accessLevel = ['read', 'write', 'schema']
   }
 
+  return accessLevel
+}
+
+export async function addDatabaseAccess(
+  database: DatabaseResult,
+  dbUser: DatabaseUserResult,
+  privileges = ''
+): Promise<{
+  database: DatabaseResult
+  dbLogin: string
+}> {
   const accesses = database.accesses
   accesses.push({
     userId: dbUser.id,
     databaseId: database.id,
-    accessLevel
+    accessLevel: getAccesses(privileges)
   })
 
   const response: TypedResponse<ApiActionResponse<DatabaseResult>> =
