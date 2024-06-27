@@ -163,32 +163,13 @@
           },
           "cron": {
             "type": "object",
-            "oneOf": [
-              {
-                "properties": {
-                  "cmd": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "cmd"
-                ],
-                "additionalProperties": false
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "php": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "php"
-                ],
-                "additionalProperties": false
-              }
-            ],
             "properties": {
+              "cmd": {
+                "type": "string"
+              },
+              "php": {
+                "type": "string"
+              },
               "every": {
                 "type": "string",
                 "enum": [
