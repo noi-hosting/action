@@ -173,6 +173,14 @@
                         "cmd": {
                           "type": "string"
                         }
+                      },
+                      "required": [
+                        "cmd"
+                      ],
+                      "not": {
+                        "required": [
+                          "php"
+                        ]
                       }
                     },
                     {
@@ -180,6 +188,14 @@
                         "php": {
                           "type": "string"
                         }
+                      },
+                      "required": [
+                        "php"
+                      ],
+                      "not": {
+                        "required": [
+                          "cmd"
+                        ]
                       }
                     }
                   ]
@@ -204,6 +220,14 @@
                             "12hour"
                           ]
                         }
+                      },
+                      "required": [
+                        "every"
+                      ],
+                      "not": {
+                        "required": [
+                          "on"
+                        ]
                       }
                     },
                     {
@@ -222,7 +246,11 @@
                             "21-1"
                           ]
                         }
-                      }
+                      },
+                      "required": [
+                        "every",
+                        "on"
+                      ]
                     },
                     {
                       "properties": {
@@ -241,7 +269,11 @@
                             "Sun"
                           ]
                         }
-                      }
+                      },
+                      "required": [
+                        "every",
+                        "on"
+                      ]
                     },
                     {
                       "properties": {
