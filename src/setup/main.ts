@@ -57,7 +57,7 @@ export async function run(): Promise<void> {
     core.setOutput('deploy-path', destinations[0].deployPath)
     core.setOutput('public-url', destinations[0].publicUrl)
 
-    if (config.project?.prune ?? true) {
+    if (config.project.prune) {
       await services.pruneBranches(projectPrefix)
     }
   } catch (error) {

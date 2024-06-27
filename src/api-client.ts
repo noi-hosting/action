@@ -242,8 +242,7 @@ export async function createWebspace(
   phpVersion: string,
   poolId: string | null = null,
   accountId: string | null = null,
-  redisEnabled = false,
-  disk = 10240
+  redisEnabled = false
 ): Promise<WebspaceResult> {
   const response: TypedResponse<ApiActionResponse<WebspaceResult>> = await _http.postJson(
     `${baseUri}/webhosting/v1/json/webspaceCreate`,
@@ -256,8 +255,7 @@ export async function createWebspace(
         comments: 'Created by github action. Please do not change name.',
         productCode: 'webhosting-webspace-v1-1m',
         cronJobs: cronjobs.map(c => transformCronJob(c, phpVersion)),
-        redisEnabled,
-        storageQuota: disk
+        redisEnabled
       },
       accesses: users.map(u => ({
         userId: u.id,
@@ -282,8 +280,7 @@ export async function updateWebspace(
   users: UserResult[],
   phpVersion: string,
   cronjobs: CronjobConfig[] | null = null,
-  redisEnabled = false,
-  disk = 10240
+  redisEnabled = false
 ): Promise<WebspaceResult> {
   const webspace = originalWebspace
   const existingUserIds = originalWebspace.accesses.map(a => a.userId)
@@ -305,8 +302,6 @@ export async function updateWebspace(
   if (null !== redisEnabled) {
     webspace.redisEnabled = redisEnabled
   }
-
-  webspace.storageQuota = disk
 
   const response: TypedResponse<ApiActionResponse<WebspaceResult>> = await _http.postJson(
     `${baseUri}/webhosting/v1/json/webspaceUpdate`,

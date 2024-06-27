@@ -116,11 +116,6 @@ export async function findOrCreateWebspace(
   webspaceAccess: WebspaceAccess
   isNew: boolean
 }> {
-  const phpv = `${app.php.version ?? ''}`
-  if ('' === phpv) {
-    throw new Error(`Please specify "app.<APP_NAME>.php.version`)
-  }
-
   const redisEnabled = Object.values(app.relationships).includes('redis')
   let webspace: WebspaceResult | null = await client.findOneWebspaceByName(webspaceName)
 
@@ -169,12 +164,10 @@ export async function findOrCreateWebspace(
       // Cronjobs are unchanged
       _.isEqual(
         webspace.cronJobs,
-        app.cron.map(c => transformCronJob(c, phpv))
+        app.cron.map(c => transformCronJob(c, app.php.version))
       ) &&
       // Redis is unchanged
       _.isEqual(redisEnabled, webspace.redisEnabled ?? false) &&
-      // Disk size is unchanged
-      _.isEqual(webspace.storageQuota, app.disk ?? 10240) &&
       // Webspace users are unchanged
       _.isEqual(
         webspace.accesses.map(a => a.userId),
@@ -185,7 +178,7 @@ export async function findOrCreateWebspace(
     } else {
       core.info(`Updating webspace ${webspaceName} (${webspace.id})`)
 
-      webspace = await client.updateWebspace(webspace, users, phpv, app.cron, redisEnabled, app.disk ?? 10240)
+      webspace = await client.updateWebspace(webspace, users, app.php.version, app.cron, redisEnabled)
     }
 
     const webspaceAccess = webspace.accesses.find(a => (ghUser.id = a.userId)) ?? null
@@ -206,11 +199,10 @@ export async function findOrCreateWebspace(
     webspaceName,
     users,
     app.cron,
-    phpv,
-    app.pool ?? null,
-    app.account ?? null,
-    redisEnabled,
-    app.disk ?? 10240
+    app.php.version,
+    app.pool,
+    app.account,
+    redisEnabled
   )
 
   do {
@@ -342,10 +334,7 @@ export async function configureDatabases(
       } else {
         core.info(`Granting access on database ${databaseInternalName}`)
 
-        const { user: dbUser, password: databasePassword } = await client.createDatabaseUser(
-          dbUserName,
-          app.account ?? null
-        )
+        const { user: dbUser, password: databasePassword } = await client.createDatabaseUser(dbUserName, app.account)
         const { database, dbLogin } = await client.addDatabaseAccess(existingDatabase, dbUser, privileges ?? '')
 
         defineEnv(envVars, relationName, database, dbLogin, databasePassword)
@@ -454,7 +443,7 @@ function translateDomainName(domainName: string | null, environment: string, con
     domainName = process.env.DOMAIN_NAME ?? ''
   }
 
-  const previewDomain = config.project?.domain ?? null
+  const previewDomain = config.project.domain ?? null
   if (null !== previewDomain && ('' === domainName || environment !== (config.project?.parent ?? ''))) {
     domainName = previewDomain
   }
@@ -489,8 +478,7 @@ function getPrivileges(accessLevel: string[]): string {
 }
 
 function mustBeUpdated(vhost: VhostResult, app: AppConfig, web: WebConfig): boolean {
-  const phpv = app.php?.version ?? process.env.PHP_VERSION ?? null
-  if (phpv && phpv !== vhost.phpVersion) {
+  if (app.php.version !== vhost.phpVersion) {
     return true
   }
 

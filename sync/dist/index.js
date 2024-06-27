@@ -30486,7 +30486,7 @@ async function findUsersByName(name) {
     return response.result?.response?.data ?? [];
 }
 exports.findUsersByName = findUsersByName;
-async function createWebspace(name, users, cronjobs, phpVersion, poolId = null, accountId = null, redisEnabled = false, disk = 10240) {
+async function createWebspace(name, users, cronjobs, phpVersion, poolId = null, accountId = null, redisEnabled = false) {
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/webspaceCreate`, {
         poolId,
         authToken: token,
@@ -30496,8 +30496,7 @@ async function createWebspace(name, users, cronjobs, phpVersion, poolId = null, 
             comments: 'Created by github action. Please do not change name.',
             productCode: 'webhosting-webspace-v1-1m',
             cronJobs: cronjobs.map(c => transformCronJob(c, phpVersion)),
-            redisEnabled,
-            storageQuota: disk
+            redisEnabled
         },
         accesses: users.map(u => ({
             userId: u.id,
@@ -30513,7 +30512,7 @@ async function createWebspace(name, users, cronjobs, phpVersion, poolId = null, 
     return response.result.response;
 }
 exports.createWebspace = createWebspace;
-async function updateWebspace(originalWebspace, users, phpVersion, cronjobs = null, redisEnabled = false, disk = 10240) {
+async function updateWebspace(originalWebspace, users, phpVersion, cronjobs = null, redisEnabled = false) {
     const webspace = originalWebspace;
     const existingUserIds = originalWebspace.accesses.map(a => a.userId);
     const accesses = originalWebspace.accesses.concat(users
@@ -30528,7 +30527,6 @@ async function updateWebspace(originalWebspace, users, phpVersion, cronjobs = nu
     if (null !== redisEnabled) {
         webspace.redisEnabled = redisEnabled;
     }
-    webspace.storageQuota = disk;
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/webspaceUpdate`, {
         authToken: token,
         webspace,
@@ -30831,10 +30829,16 @@ exports.readConfig = void 0;
 const yaml = __importStar(__nccwpck_require__(1917));
 const fs_1 = __importDefault(__nccwpck_require__(7147));
 async function readConfig(appKey) {
-    const config = Object.assign({}, yaml.load(fs_1.default.readFileSync('./.hosting/config.yaml', 'utf8')));
+    const config = Object.assign({
+        project: {
+            prune: true
+        }
+    }, yaml.load(fs_1.default.readFileSync('./.hosting/config.yaml', 'utf8')));
     let app = null;
     if (appKey in config.applications) {
         app = Object.assign({
+            pool: null,
+            account: null,
             php: {
                 ini: {},
                 extensions: []
@@ -30924,7 +30928,7 @@ async function run() {
             required: true
         });
         if ('' === fromEnv) {
-            fromEnv = config.project?.parent ?? '';
+            fromEnv = config.project.parent;
         }
         if ('' === fromEnv || '' === toEnv) {
             core.info('Sync destinations were not specified and cannot be derived. Please check the `project.parent` config in the ".hosting/config.yaml" file.');
@@ -30943,7 +30947,7 @@ async function run() {
                 if (null === toWebspace) {
                     continue;
                 }
-                const dirs = Object.values(app1.sync ?? {});
+                const dirs = Object.values(app1.sync);
                 for (let dir of dirs) {
                     dir = dir.trim().replace(/\/$/, '').replace(/^\//, '');
                     const pathFrom = `/home/${fromWebspace.webspaceName}/html/current/${dir}`;
@@ -30970,7 +30974,7 @@ async function run() {
             }
         }
         else if (null !== app) {
-            for (const dbName of Object.values(app.relationships ?? {}).filter(d => 'database' === d.split(':')[0] &&
+            for (const dbName of Object.values(app.relationships).filter(d => 'database' === d.split(':')[0] &&
                 (syncDatabases.length === 0 || syncDatabases.includes(d.split(':')[1] ?? appKey)))) {
                 dbQueries.push(`${projectPrefix}-${fromEnv}-${dbName}`);
                 dbQueries.push(`${projectPrefix}-${toEnv}-${dbName}`);

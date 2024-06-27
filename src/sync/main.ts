@@ -32,7 +32,7 @@ export async function run(): Promise<void> {
       required: true
     })
     if ('' === fromEnv) {
-      fromEnv = config.project?.parent ?? ''
+      fromEnv = config.project.parent
     }
 
     if ('' === fromEnv || '' === toEnv) {
@@ -57,7 +57,7 @@ export async function run(): Promise<void> {
           continue
         }
 
-        const dirs = Object.values(app1.sync ?? {})
+        const dirs = Object.values(app1.sync)
         for (let dir of dirs) {
           dir = dir.trim().replace(/\/$/, '').replace(/^\//, '')
           const pathFrom = `/home/${fromWebspace.webspaceName}/html/current/${dir}`
@@ -88,7 +88,7 @@ export async function run(): Promise<void> {
         dbQueries.push(`${projectPrefix}-${toEnv}-*`)
       }
     } else if (null !== app) {
-      for (const dbName of Object.values(app.relationships ?? {}).filter(
+      for (const dbName of Object.values(app.relationships).filter(
         d =>
           'database' === d.split(':')[0] &&
           (syncDatabases.length === 0 || syncDatabases.includes(d.split(':')[1] ?? appKey))

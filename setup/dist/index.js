@@ -46472,7 +46472,7 @@ async function findUsersByName(name) {
     return response.result?.response?.data ?? [];
 }
 exports.findUsersByName = findUsersByName;
-async function createWebspace(name, users, cronjobs, phpVersion, poolId = null, accountId = null, redisEnabled = false, disk = 10240) {
+async function createWebspace(name, users, cronjobs, phpVersion, poolId = null, accountId = null, redisEnabled = false) {
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/webspaceCreate`, {
         poolId,
         authToken: token,
@@ -46482,8 +46482,7 @@ async function createWebspace(name, users, cronjobs, phpVersion, poolId = null, 
             comments: 'Created by github action. Please do not change name.',
             productCode: 'webhosting-webspace-v1-1m',
             cronJobs: cronjobs.map(c => transformCronJob(c, phpVersion)),
-            redisEnabled,
-            storageQuota: disk
+            redisEnabled
         },
         accesses: users.map(u => ({
             userId: u.id,
@@ -46499,7 +46498,7 @@ async function createWebspace(name, users, cronjobs, phpVersion, poolId = null, 
     return response.result.response;
 }
 exports.createWebspace = createWebspace;
-async function updateWebspace(originalWebspace, users, phpVersion, cronjobs = null, redisEnabled = false, disk = 10240) {
+async function updateWebspace(originalWebspace, users, phpVersion, cronjobs = null, redisEnabled = false) {
     const webspace = originalWebspace;
     const existingUserIds = originalWebspace.accesses.map(a => a.userId);
     const accesses = originalWebspace.accesses.concat(users
@@ -46514,7 +46513,6 @@ async function updateWebspace(originalWebspace, users, phpVersion, cronjobs = nu
     if (null !== redisEnabled) {
         webspace.redisEnabled = redisEnabled;
     }
-    webspace.storageQuota = disk;
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/webspaceUpdate`, {
         authToken: token,
         webspace,
@@ -46817,10 +46815,16 @@ exports.readConfig = void 0;
 const yaml = __importStar(__nccwpck_require__(1917));
 const fs_1 = __importDefault(__nccwpck_require__(7147));
 async function readConfig(appKey) {
-    const config = Object.assign({}, yaml.load(fs_1.default.readFileSync('./.hosting/config.yaml', 'utf8')));
+    const config = Object.assign({
+        project: {
+            prune: true
+        }
+    }, yaml.load(fs_1.default.readFileSync('./.hosting/config.yaml', 'utf8')));
     let app = null;
     if (appKey in config.applications) {
         app = Object.assign({
+            pool: null,
+            account: null,
             php: {
                 ini: {},
                 extensions: []
@@ -46916,7 +46920,7 @@ async function run() {
         core.setOutput('env-vars', Object.assign(env1, env2, env3));
         core.setOutput('deploy-path', destinations[0].deployPath);
         core.setOutput('public-url', destinations[0].publicUrl);
-        if (config.project?.prune ?? true) {
+        if (config.project.prune) {
             await services.pruneBranches(projectPrefix);
         }
     }
@@ -47020,10 +47024,6 @@ async function applyDatabases(databasePrefix, appKey, app, config) {
 }
 exports.applyDatabases = applyDatabases;
 async function findOrCreateWebspace(webspaceName, app) {
-    const phpv = `${app.php.version ?? ''}`;
-    if ('' === phpv) {
-        throw new Error(`Please specify "app.<APP_NAME>.php.version`);
-    }
     const redisEnabled = Object.values(app.relationships).includes('redis');
     let webspace = await client.findOneWebspaceByName(webspaceName);
     const additionalUsers = [];
@@ -47059,18 +47059,16 @@ async function findOrCreateWebspace(webspaceName, app) {
     if (null !== webspace) {
         if (
         // Cronjobs are unchanged
-        _.isEqual(webspace.cronJobs, app.cron.map(c => (0, api_client_1.transformCronJob)(c, phpv))) &&
+        _.isEqual(webspace.cronJobs, app.cron.map(c => (0, api_client_1.transformCronJob)(c, app.php.version))) &&
             // Redis is unchanged
             _.isEqual(redisEnabled, webspace.redisEnabled ?? false) &&
-            // Disk size is unchanged
-            _.isEqual(webspace.storageQuota, app.disk ?? 10240) &&
             // Webspace users are unchanged
             _.isEqual(webspace.accesses.map(a => a.userId), availUsers.map(u => u.id))) {
             core.info(`Using webspace ${webspaceName} (${webspace.id})`);
         }
         else {
             core.info(`Updating webspace ${webspaceName} (${webspace.id})`);
-            webspace = await client.updateWebspace(webspace, users, phpv, app.cron, redisEnabled, app.disk ?? 10240);
+            webspace = await client.updateWebspace(webspace, users, app.php.version, app.cron, redisEnabled);
         }
         const webspaceAccess = webspace.accesses.find(a => (ghUser.id = a.userId)) ?? null;
         if (null === webspaceAccess) {
@@ -47083,7 +47081,7 @@ async function findOrCreateWebspace(webspaceName, app) {
         };
     }
     core.info('Creating a new webspace...');
-    webspace = await client.createWebspace(webspaceName, users, app.cron, phpv, app.pool ?? null, app.account ?? null, redisEnabled, app.disk ?? 10240);
+    webspace = await client.createWebspace(webspaceName, users, app.cron, app.php.version, app.pool, app.account, redisEnabled);
     do {
         await (0, wait_1.wait)(2000);
         core.info(`Waiting for webspace ${webspaceName} (${webspace.id}) to boot...`);
@@ -47169,7 +47167,7 @@ async function configureDatabases(config, app, databasePrefix, appKey, foundData
             }
             else {
                 core.info(`Granting access on database ${databaseInternalName}`);
-                const { user: dbUser, password: databasePassword } = await client.createDatabaseUser(dbUserName, app.account ?? null);
+                const { user: dbUser, password: databasePassword } = await client.createDatabaseUser(dbUserName, app.account);
                 const { database, dbLogin } = await client.addDatabaseAccess(existingDatabase, dbUser, privileges ?? '');
                 defineEnv(envVars, relationName, database, dbLogin, databasePassword);
             }
@@ -47247,7 +47245,7 @@ function translateDomainName(domainName, environment, config, app) {
     if (null === domainName) {
         domainName = node_process_1.default.env.DOMAIN_NAME ?? '';
     }
-    const previewDomain = config.project?.domain ?? null;
+    const previewDomain = config.project.domain ?? null;
     if (null !== previewDomain && ('' === domainName || environment !== (config.project?.parent ?? ''))) {
         domainName = previewDomain;
     }
@@ -47275,8 +47273,7 @@ function getPrivileges(accessLevel) {
     throw new Error(`Access level "${JSON.stringify(accessLevel)}" unknown.`);
 }
 function mustBeUpdated(vhost, app, web) {
-    const phpv = app.php?.version ?? node_process_1.default.env.PHP_VERSION ?? null;
-    if (phpv && phpv !== vhost.phpVersion) {
+    if (app.php.version !== vhost.phpVersion) {
         return true;
     }
     // todo phpini

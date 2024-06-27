@@ -8,12 +8,21 @@ export async function readConfig(appKey: string): Promise<{
     [key: string]: string | boolean | number
   }
 }> {
-  const config = Object.assign({}, yaml.load(fs.readFileSync('./.hosting/config.yaml', 'utf8')) as Config)
+  const config = Object.assign(
+    {
+      project: {
+        prune: true
+      }
+    },
+    yaml.load(fs.readFileSync('./.hosting/config.yaml', 'utf8')) as Config
+  )
 
   let app = null
   if (appKey in config.applications) {
     app = Object.assign(
       {
+        pool: null,
+        account: null,
         php: {
           ini: {},
           extensions: []
@@ -41,10 +50,10 @@ export async function readConfig(appKey: string): Promise<{
 }
 
 interface Config {
-  project?: {
-    parent?: string
+  project: {
+    parent: string
     domain?: string
-    prune?: boolean
+    prune: boolean
   }
   applications: {
     [app: string]: AppConfig
@@ -58,8 +67,8 @@ interface Config {
 }
 
 interface AppConfig {
-  pool?: string
-  account?: string
+  pool: string | null
+  account: string | null
   php: {
     version: string
     extensions: string[]
@@ -74,7 +83,6 @@ interface AppConfig {
     [key: string]: string
   }
   web: WebConfig[]
-  disk?: number
   sync: string[]
   cron: CronjobConfig[]
   users: {
