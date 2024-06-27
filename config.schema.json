@@ -169,11 +169,11 @@
                   "properties": {
                     "cmd": {
                       "type": "string"
-                    },
-                    "required": [
-                      "cmd"
-                    ]
+                    }
                   },
+                  "required": [
+                    "cmd"
+                  ],
                   "additionalProperties": false
                 },
                 {
@@ -181,11 +181,11 @@
                   "properties": {
                     "php": {
                       "type": "string"
-                    },
-                    "required": [
-                      "php"
-                    ]
+                    }
                   },
+                  "required": [
+                    "php"
+                  ],
                   "additionalProperties": false
                 }
               ],
