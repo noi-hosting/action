@@ -162,41 +162,45 @@
             "minItems": 1
           },
           "cron": {
-            "type": "object",
-            "properties": {
-              "cmd": {
-                "type": "string"
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cmd": {
+                  "type": "string"
+                },
+                "php": {
+                  "type": "string"
+                },
+                "every": {
+                  "type": "string",
+                  "enum": [
+                    "1min",
+                    "5min",
+                    "10min",
+                    "15min",
+                    "30min",
+                    "1hour",
+                    "2hour",
+                    "3hour",
+                    "4hour",
+                    "6hour",
+                    "12hour",
+                    "day",
+                    "week",
+                    "month"
+                  ]
+                },
+                "on": {
+                  "type": "string"
+                }
               },
-              "php": {
-                "type": "string"
-              },
-              "every": {
-                "type": "string",
-                "enum": [
-                  "1min",
-                  "5min",
-                  "10min",
-                  "15min",
-                  "30min",
-                  "1hour",
-                  "2hour",
-                  "3hour",
-                  "4hour",
-                  "6hour",
-                  "12hour",
-                  "day",
-                  "week",
-                  "month"
-                ]
-              },
-              "on": {
-                "type": "string"
-              }
+              "required": [
+                "every"
+              ],
+              "additionalProperties": false
             },
-            "required": [
-              "every"
-            ],
-            "additionalProperties": false
+            "minItems": 1
           },
           "users": {
             "type": "object",
