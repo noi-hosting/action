@@ -38,10 +38,12 @@
         "type": "object",
         "properties": {
           "pool": {
-            "type": "string"
+            "type": "string",
+            "description": "The ID of the pool, also known as managed server on Hosting.de. Retrieve the pool ID from the admin panel."
           },
           "account": {
-            "type": "string"
+            "type": "string",
+            "description": "The (sub-)account ID on Hosting.de. Retrieve the account ID from the admin panel."
           },
           "php": {
             "type": "object",
@@ -87,6 +89,7 @@
           },
           "relationships": {
             "type": "object",
+            "description": "Relationships are services that are made available to your application, usually by means of environment variables. Use the <SERVICE>:<ENDPOINT> syntax. Examples include: \"database:app1\" for referencing a database endpoint with name \"app1\", or \"redis\" for referencing a redis service (no endpoints available). The key of the relationship will be used to reference the environment variable. For instance a relation named \"database\" becomes \"DATABASE_URL\".",
             "minProperties": 1,
             "propertyNames": {
               "pattern": "^[a-z0-9-_]+$"
@@ -319,7 +322,8 @@
             "pattern": "^\\w+$"
           },
           "minItems": 1,
-          "uniqueItems": true
+          "uniqueItems": true,
+          "description": "The databases, also referred to as <SCHEMA>, to provide to the applications."
         },
         "endpoints": {
           "type": "object",
@@ -329,7 +333,8 @@
           },
           "additionalProperties": {
             "type": "string",
-            "pattern": "^\\w+(:(admin|ro|rw))?$"
+            "pattern": "^\\w+(:(admin|ro|rw))?$",
+            "description": "Use <SCHEMA>:<ACCESS_LEVEL> notation here, which means, that the given endpoint can access <SCHEMA> with <ACCESS_LEVEL> permissions."
           }
         }
       },
