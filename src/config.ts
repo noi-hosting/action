@@ -1,28 +1,53 @@
 import * as yaml from 'js-yaml'
 import fs from 'fs'
 
-export async function config(appKey: string): Promise<{
-  manifest: Manifest
-  app: ManifestApp | null
-  envVars: { [key: string]: string | boolean | number }
+export async function readConfig(appKey: string): Promise<{
+  config: Config
+  app: AppConfig | null
+  envVars: {
+    [key: string]: string | boolean | number
+  }
 }> {
-  const manifest = yaml.load(
-    fs.readFileSync('./.hosting/config.yaml', 'utf8')
-  ) as Manifest
-  const app = manifest.applications[appKey] ?? null
+  const config = Object.assign({}, yaml.load(fs.readFileSync('./.hosting/config.yaml', 'utf8')) as Config)
+
+  let app = null
+  if (appKey in config.applications) {
+    app = Object.assign(
+      {
+        php: {
+          ini: {},
+          extensions: []
+        },
+        env: {},
+        relationships: {},
+        web: {
+          locations: {}
+        },
+        users: {},
+        cron: [],
+        sync: []
+      },
+      config.applications[appKey]
+    )
+  }
+
   const envVars = app?.env ?? {}
 
-  return { manifest, app, envVars }
+  return {
+    config,
+    app,
+    envVars
+  }
 }
 
-interface Manifest {
+interface Config {
   project?: {
     parent?: string
     domain?: string
     prune?: boolean
   }
   applications: {
-    [app: string]: ManifestApp
+    [app: string]: AppConfig
   }
   databases?: {
     schemas: string[]
@@ -32,40 +57,39 @@ interface Manifest {
   }
 }
 
-interface ManifestApp {
+interface AppConfig {
   pool?: string
   account?: string
   php: {
     version: string
-    extensions?: string[]
-    ini?: {
+    extensions: string[]
+    ini: {
       [key: string]: string | boolean
     }
   }
-  env?: {
+  env: {
     [key: string]: string | boolean | number
   }
-  relationships?: {
+  relationships: {
     [key: string]: string
   }
-  web: {
-    [domainName: string]: ManifestAppWeb
-  }
+  web: WebConfig[]
   disk?: number
-  sync?: string[]
-  cron?: CronjobConfig[]
-  users?: {
+  sync: string[]
+  cron: CronjobConfig[]
+  users: {
     [displayName: string]: string
   }
 }
 
-interface ManifestAppWeb {
+interface WebConfig {
   root?: string
+  domainName?: string
   www?: boolean
   locations: {
     [matchString: string]: {
       passthru?: string | boolean
-      expires?: boolean
+      expires?: string
       allow?: boolean
     }
   }
@@ -78,4 +102,4 @@ interface CronjobConfig {
   on: string
 }
 
-export { Manifest, ManifestApp, ManifestAppWeb, CronjobConfig }
+export { Config, AppConfig, WebConfig, CronjobConfig }

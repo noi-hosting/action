@@ -2,17 +2,18 @@ import * as core from '@actions/core'
 import crypto from 'crypto'
 import { HttpClient } from '@actions/http-client'
 import { TypedResponse } from '@actions/http-client/lib/interfaces'
-import { CronjobConfig, ManifestApp, ManifestAppWeb } from './config'
+import { CronjobConfig, AppConfig, WebConfig } from './config'
 
 const _http = new HttpClient()
-const token = core.getInput('auth-token', { required: true })
+const token = core.getInput('auth-token', {
+  required: true
+})
 const baseUri = 'https://secure.hosting.de/api'
 
-export async function findActiveWebspaces(
-  projectPrefix: string
-): Promise<WebspaceResult[]> {
-  const response: TypedResponse<ApiFindResponse<WebspaceResult>> =
-    await _http.postJson(`${baseUri}/webhosting/v1/json/webspacesFind`, {
+export async function findActiveWebspaces(projectPrefix: string): Promise<WebspaceResult[]> {
+  const response: TypedResponse<ApiFindResponse<WebspaceResult>> = await _http.postJson(
+    `${baseUri}/webhosting/v1/json/webspacesFind`,
+    {
       authToken: token,
       filter: {
         subFilterConnective: 'AND',
@@ -27,16 +28,16 @@ export async function findActiveWebspaces(
           }
         ]
       }
-    })
+    }
+  )
 
   return response.result?.response?.data ?? []
 }
 
-export async function findOneWebspaceByName(
-  webspaceName: string
-): Promise<WebspaceResult | null> {
-  const response: TypedResponse<ApiFindResponse<WebspaceResult>> =
-    await _http.postJson(`${baseUri}/webhosting/v1/json/webspacesFind`, {
+export async function findOneWebspaceByName(webspaceName: string): Promise<WebspaceResult | null> {
+  const response: TypedResponse<ApiFindResponse<WebspaceResult>> = await _http.postJson(
+    `${baseUri}/webhosting/v1/json/webspacesFind`,
+    {
       authToken: token,
       limit: 1,
       filter: {
@@ -52,37 +53,35 @@ export async function findOneWebspaceByName(
           }
         ]
       }
-    })
+    }
+  )
   if ((response.result?.response?.totalEntries ?? 0) > 1) {
-    throw new Error(
-      `We found more than 1 webspace with name "${webspaceName}" and cannot know where to deploy to.`
-    )
+    throw new Error(`We found more than 1 webspace with name "${webspaceName}" and cannot know where to deploy to.`)
   }
 
   return response.result?.response?.data[0] ?? null
 }
 
-export async function findWebspaceById(
-  webspaceId: string
-): Promise<WebspaceResult | null> {
-  const response: TypedResponse<ApiFindResponse<WebspaceResult>> =
-    await _http.postJson(`${baseUri}/webhosting/v1/json/webspacesFind`, {
+export async function findWebspaceById(webspaceId: string): Promise<WebspaceResult | null> {
+  const response: TypedResponse<ApiFindResponse<WebspaceResult>> = await _http.postJson(
+    `${baseUri}/webhosting/v1/json/webspacesFind`,
+    {
       authToken: token,
       limit: 1,
       filter: {
         field: 'webspaceId',
         value: webspaceId
       }
-    })
+    }
+  )
 
   return response.result?.response?.data[0] ?? null
 }
 
-export async function findVhostByWebspace(
-  webspaceId: string
-): Promise<VhostResult[]> {
-  const response: TypedResponse<ApiFindResponse<VhostResult>> =
-    await _http.postJson(`${baseUri}/webhosting/v1/json/vhostsFind`, {
+export async function findVhostByWebspace(webspaceId: string): Promise<VhostResult[]> {
+  const response: TypedResponse<ApiFindResponse<VhostResult>> = await _http.postJson(
+    `${baseUri}/webhosting/v1/json/vhostsFind`,
+    {
       authToken: token,
       filter: {
         subFilterConnective: 'AND',
@@ -97,7 +96,8 @@ export async function findVhostByWebspace(
           }
         ]
       }
-    })
+    }
+  )
 
   return response.result?.response?.data ?? []
 }
@@ -137,9 +137,7 @@ export async function deleteDatabaseUserById(userId: string): Promise<void> {
   })
 }
 
-export async function findDatabases(
-  databaseNames: string | string[]
-): Promise<DatabaseResult[]> {
+export async function findDatabases(databaseNames: string | string[]): Promise<DatabaseResult[]> {
   if (typeof databaseNames === 'string') {
     databaseNames = [databaseNames]
   }
@@ -152,8 +150,9 @@ export async function findDatabases(
     })
   }
 
-  const response: TypedResponse<ApiFindResponse<DatabaseResult>> =
-    await _http.postJson(`${baseUri}/database/v1/json/databasesFind`, {
+  const response: TypedResponse<ApiFindResponse<DatabaseResult>> = await _http.postJson(
+    `${baseUri}/database/v1/json/databasesFind`,
+    {
       authToken: token,
       filter: {
         subFilterConnective: 'AND',
@@ -168,33 +167,32 @@ export async function findDatabases(
           }
         ]
       }
-    })
+    }
+  )
 
   return response.result?.response?.data ?? []
 }
 
-export async function findDatabaseById(
-  databaseId: string
-): Promise<DatabaseResult | null> {
-  const response: TypedResponse<ApiFindResponse<DatabaseResult>> =
-    await _http.postJson(`${baseUri}/database/v1/json/databasesFind`, {
+export async function findDatabaseById(databaseId: string): Promise<DatabaseResult | null> {
+  const response: TypedResponse<ApiFindResponse<DatabaseResult>> = await _http.postJson(
+    `${baseUri}/database/v1/json/databasesFind`,
+    {
       authToken: token,
       limit: 1,
       filter: {
         field: 'databaseId',
         value: databaseId
       }
-    })
+    }
+  )
 
   return response.result?.response?.data[0] ?? null
 }
 
-export async function findDatabaseAccesses(
-  userName: string,
-  databaseId: string
-): Promise<DatabaseUserResult[]> {
-  const response: TypedResponse<ApiFindResponse<DatabaseUserResult>> =
-    await _http.postJson(`${baseUri}/database/v1/json/usersFind`, {
+export async function findDatabaseAccesses(userName: string, databaseId: string): Promise<DatabaseUserResult[]> {
+  const response: TypedResponse<ApiFindResponse<DatabaseUserResult>> = await _http.postJson(
+    `${baseUri}/database/v1/json/usersFind`,
+    {
       authToken: token,
       filter: {
         subFilterConnective: 'AND',
@@ -209,20 +207,20 @@ export async function findDatabaseAccesses(
           }
         ]
       }
-    })
+    }
+  )
 
   return response.result?.response?.data ?? []
 }
 
-export async function findUsersByName(
-  name: string | string[]
-): Promise<WebspaceUserResult[]> {
+export async function findUsersByName(name: string | string[]): Promise<WebspaceUserResult[]> {
   if (typeof name === 'string') {
     name = [name]
   }
 
-  const response: TypedResponse<ApiFindResponse<WebspaceUserResult>> =
-    await _http.postJson(`${baseUri}/webhosting/v1/json/usersFind`, {
+  const response: TypedResponse<ApiFindResponse<WebspaceUserResult>> = await _http.postJson(
+    `${baseUri}/webhosting/v1/json/usersFind`,
+    {
       authToken: token,
       filter: {
         subFilterConnective: 'OR',
@@ -231,7 +229,8 @@ export async function findUsersByName(
           value: q
         }))
       }
-    })
+    }
+  )
 
   return response.result?.response?.data ?? []
 }
@@ -246,8 +245,9 @@ export async function createWebspace(
   redisEnabled = false,
   disk = 10240
 ): Promise<WebspaceResult> {
-  const response: TypedResponse<ApiActionResponse<WebspaceResult>> =
-    await _http.postJson(`${baseUri}/webhosting/v1/json/webspaceCreate`, {
+  const response: TypedResponse<ApiActionResponse<WebspaceResult>> = await _http.postJson(
+    `${baseUri}/webhosting/v1/json/webspaceCreate`,
+    {
       poolId,
       authToken: token,
       webspace: {
@@ -263,7 +263,8 @@ export async function createWebspace(
         userId: u.id,
         sshAccess: true
       }))
-    })
+    }
+  )
 
   if (null === response.result) {
     throw new Error('Unexpected error')
@@ -307,12 +308,14 @@ export async function updateWebspace(
 
   webspace.storageQuota = disk
 
-  const response: TypedResponse<ApiActionResponse<WebspaceResult>> =
-    await _http.postJson(`${baseUri}/webhosting/v1/json/webspaceUpdate`, {
+  const response: TypedResponse<ApiActionResponse<WebspaceResult>> = await _http.postJson(
+    `${baseUri}/webhosting/v1/json/webspaceUpdate`,
+    {
       authToken: token,
       webspace,
       accesses
-    })
+    }
+  )
 
   if (null === response.result) {
     throw new Error('Unexpected error')
@@ -325,16 +328,15 @@ export async function updateWebspace(
   return response.result.response
 }
 
-export async function updateDatabase(
-  database: DatabaseResult,
-  accesses: DatabaseAccess[]
-): Promise<DatabaseResult> {
-  const response: TypedResponse<ApiActionResponse<DatabaseResult>> =
-    await _http.postJson(`${baseUri}/database/v1/json/databaseUpdate`, {
+export async function updateDatabase(database: DatabaseResult, accesses: DatabaseAccess[]): Promise<DatabaseResult> {
+  const response: TypedResponse<ApiActionResponse<DatabaseResult>> = await _http.postJson(
+    `${baseUri}/database/v1/json/databaseUpdate`,
+    {
       authToken: token,
       database,
       accesses: accesses ?? []
-    })
+    }
+  )
 
   if (null === response.result) {
     throw new Error('Unexpected error')
@@ -349,13 +351,14 @@ export async function updateDatabase(
 
 export async function createVhost(
   webspace: WebspaceResult,
-  web: ManifestAppWeb,
-  app: ManifestApp,
+  web: WebConfig,
+  app: AppConfig,
   domainName: string,
   phpVersion: string
 ): Promise<VhostResult> {
-  const response: TypedResponse<ApiActionResponse<VhostResult>> =
-    await _http.postJson(`${baseUri}/webhosting/v1/json/vhostCreate`, {
+  const response: TypedResponse<ApiActionResponse<VhostResult>> = await _http.postJson(
+    `${baseUri}/webhosting/v1/json/vhostCreate`,
+    {
       authToken: token,
       vhost: {
         domainName,
@@ -366,22 +369,12 @@ export async function createVhost(
         redirectHttpToHttps: true,
         phpVersion,
         webRoot: `current/${web.root ?? ''}`.replace(/\/$/, ''),
-        locations: Object.entries(web.locations ?? {}).map(function ([
-          matchString,
-          location
-        ]) {
+        locations: Object.entries(web.locations).map(function ([matchString, location]) {
           return {
             matchString,
-            matchType: matchString.startsWith('^')
-              ? 'regex'
-              : matchString.startsWith('/')
-                ? 'directory'
-                : 'default',
+            matchType: matchString.startsWith('^') ? 'regex' : matchString.startsWith('/') ? 'directory' : 'default',
             locationType: location.allow ?? true ? 'generic' : 'blockAccess',
-            mapScript:
-              typeof (location.passthru ?? false) === 'string'
-                ? location.passthru
-                : '',
+            mapScript: typeof (location.passthru ?? false) === 'string' ? location.passthru : '',
             phpEnabled: false !== (location.passthru ?? false)
           }
         }),
@@ -391,9 +384,10 @@ export async function createVhost(
         }
       },
       phpIni: {
-        values: transformPhpIni(app.php?.ini ?? {}, app.php?.extensions ?? [])
+        values: transformPhpIni(app.php.ini, app.php.extensions)
       }
-    })
+    }
+  )
 
   if (null === response.result) {
     throw new Error('Unexpected error')
@@ -418,8 +412,9 @@ export async function createDatabase(
 }> {
   const { user, password } = await createDatabaseUser(dbUserName, accountId)
 
-  const response: TypedResponse<ApiActionResponse<DatabaseResult>> =
-    await _http.postJson(`${baseUri}/database/v1/json/databaseCreate`, {
+  const response: TypedResponse<ApiActionResponse<DatabaseResult>> = await _http.postJson(
+    `${baseUri}/database/v1/json/databaseCreate`,
+    {
       authToken: token,
       poolId,
       database: {
@@ -435,7 +430,8 @@ export async function createDatabase(
           accessLevel: ['read', 'write', 'schema']
         }
       ]
-    })
+    }
+  )
 
   if (null === response.result) {
     throw new Error('Unexpected error')
@@ -487,8 +483,9 @@ export async function addDatabaseAccess(
     accessLevel: getAccesses(privileges)
   })
 
-  const response: TypedResponse<ApiActionResponse<DatabaseResult>> =
-    await _http.postJson(`${baseUri}/database/v1/json/databaseUpdate`, {
+  const response: TypedResponse<ApiActionResponse<DatabaseResult>> = await _http.postJson(
+    `${baseUri}/database/v1/json/databaseUpdate`,
+    {
       authToken: token,
       database: {
         id: database.id,
@@ -499,7 +496,8 @@ export async function addDatabaseAccess(
         comments: database.comments
       },
       accesses
-    })
+    }
+  )
 
   if (null === response.result) {
     throw new Error('Unexpected error')
@@ -518,12 +516,10 @@ export async function addDatabaseAccess(
   }
 }
 
-export async function createWebspaceUser(
-  name: string,
-  sshKey: string
-): Promise<WebspaceUserResult> {
-  const response: TypedResponse<ApiActionResponse<WebspaceUserResult>> =
-    await _http.postJson(`${baseUri}/webhosting/v1/json/userCreate`, {
+export async function createWebspaceUser(name: string, sshKey: string): Promise<WebspaceUserResult> {
+  const response: TypedResponse<ApiActionResponse<WebspaceUserResult>> = await _http.postJson(
+    `${baseUri}/webhosting/v1/json/userCreate`,
+    {
       authToken: token,
       user: {
         sshKey,
@@ -531,7 +527,8 @@ export async function createWebspaceUser(
         comment: 'Created by github action. Please do not modify.'
       },
       password: crypto.randomUUID()
-    })
+    }
+  )
 
   if (null === response.result) {
     throw new Error('Unexpected error')
@@ -547,11 +544,15 @@ export async function createWebspaceUser(
 export async function createDatabaseUser(
   dbUserName: string,
   accountId: string | null = null
-): Promise<{ user: DatabaseUserResult; password: string }> {
+): Promise<{
+  user: DatabaseUserResult
+  password: string
+}> {
   const password = crypto.randomUUID()
 
-  const response: TypedResponse<ApiActionResponse<DatabaseUserResult>> =
-    await _http.postJson(`${baseUri}/database/v1/json/userCreate`, {
+  const response: TypedResponse<ApiActionResponse<DatabaseUserResult>> = await _http.postJson(
+    `${baseUri}/database/v1/json/userCreate`,
+    {
       authToken: token,
       user: {
         name: dbUserName,
@@ -559,7 +560,8 @@ export async function createDatabaseUser(
         accountId
       },
       password
-    })
+    }
+  )
 
   if (null === response.result) {
     throw new Error('Unexpected error')
@@ -569,11 +571,16 @@ export async function createDatabaseUser(
     throw new Error(JSON.stringify(response.result.errors ?? []))
   }
 
-  return { user: response.result.response, password }
+  return {
+    user: response.result.response,
+    password
+  }
 }
 
 function transformPhpIni(
-  ini: { [key: string]: string | boolean },
+  ini: {
+    [key: string]: string | boolean
+  },
   extensions: string[]
 ): object {
   for (const ext of extensions) {
@@ -582,13 +589,13 @@ function transformPhpIni(
     }
   }
 
-  return Object.entries(ini).map(([k, v]) => ({ key: k, value: `${v}` }))
+  return Object.entries(ini).map(([k, v]) => ({
+    key: k,
+    value: `${v}`
+  }))
 }
 
-export function transformCronJob(
-  config: CronjobConfig,
-  phpVersion: string
-): CronJob {
+export function transformCronJob(config: CronjobConfig, phpVersion: string): CronJob {
   // Use default values so that _.isEqual comparison works
   const cronjob = {
     comments: '',
@@ -789,10 +796,4 @@ interface DatabaseResult {
   limitations: string[]
 }
 
-export {
-  VhostResult,
-  WebspaceAccess,
-  WebspaceResult,
-  DatabaseResult,
-  UserResult
-}
+export { VhostResult, WebspaceAccess, WebspaceResult, DatabaseResult, UserResult }

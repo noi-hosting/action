@@ -8,17 +8,15 @@ inputs:
     required: true
   app:
     description:
-      You can only deploy one app on a time, provide the key of the current
-      application in the yaml manifest.
+      You can only deploy one app on a time, provide the key of the current application defined in the config file.
     default: app
   project-prefix:
     description:
-      A prefix used to identify resources on Hosting.de. Must be kept unique
-      under all projects under the account. Keep it short, e.g. `project1`
+      A prefix used to identify resources on Hosting.de. Must be kept unique under all projects under the account. Keep
+      it short, e.g. `project1`
     required: true
   ssh-public-key:
-    description:
-      The SSH public key that matches the private key configured for deploying.
+    description: The SSH public key that matches the private key configured for deploying.
     required: true
 
 outputs:
@@ -42,12 +40,10 @@ outputs:
     description: PHP extensions available in runtime.
   sync-files:
     description:
-      This is true when this is a newly created webspace that files shall be
-      synced from the parent environment.
+      This is true when this is a newly created webspace that files shall be synced from the parent environment.
   sync-databases:
     description:
-      A whitespace separated list of databases that are newly created and shall
-      be synced from the parent environment.
+      A whitespace separated list of databases that are newly created and shall be synced from the parent environment.
 
 runs:
   using: node20

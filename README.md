@@ -2,9 +2,8 @@
 
 # Push-to-Deploy for Hosting.de
 
-This GitHub Action brings an entire push-to-deploy workflow to your project. It
-uses the [Hosting.de API][1] to create webspaces, database, etc. for each
-configured branch and finally deploys the project utilizing [Deployer][2].
+This GitHub Action brings an entire push-to-deploy workflow to your project. It uses the [Hosting.de API][1] to create
+webspaces, database, etc. for each configured branch and finally deploys the project utilizing [Deployer][2].
 
 ```yaml
 jobs:
@@ -77,6 +76,5 @@ npm run all
 
 ### Publishing a New Release
 
-This project includes a helper script, [`script/release`](./script/release)
-designed to streamline the process of tagging and pushing new releases for
-GitHub Actions.
+This project includes a helper script, [`script/release`](./script/release) designed to streamline the process of
+tagging and pushing new releases for GitHub Actions.

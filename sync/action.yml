@@ -7,11 +7,9 @@ inputs:
     description: The API authentication token, from the Hosting.de admin panel.
     required: true
   from:
-    description:
-      The environment to use its data from. Defaults to the parent environment.
+    description: The environment to use its data from. Defaults to the parent environment.
   to:
-    description:
-      The environment that gets overridden. Must not be the parent environment.
+    description: The environment that gets overridden. Must not be the parent environment.
     required: true
   app:
     description: Limit sync to one app.
@@ -27,8 +25,8 @@ inputs:
     default: ''
   project-prefix:
     description:
-      A prefix used to identify resources on Hosting.de. Must be kept unique
-      under all projects under the account. Keep it short, e.g. `project1`.
+      A prefix used to identify resources on Hosting.de. Must be kept unique under all projects under the account. Keep
+      it short, e.g. `project1`.
     required: true
   ssh-private-key:
     description: The SSH private key to access webspaces.

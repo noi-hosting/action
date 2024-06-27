@@ -30292,7 +30292,9 @@ const core = __importStar(__nccwpck_require__(2186));
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
 const http_client_1 = __nccwpck_require__(6255);
 const _http = new http_client_1.HttpClient();
-const token = core.getInput('auth-token', { required: true });
+const token = core.getInput('auth-token', {
+    required: true
+});
 const baseUri = 'https://secure.hosting.de/api';
 async function findActiveWebspaces(projectPrefix) {
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/webspacesFind`, {
@@ -30568,18 +30570,12 @@ async function createVhost(webspace, web, app, domainName, phpVersion) {
             redirectHttpToHttps: true,
             phpVersion,
             webRoot: `current/${web.root ?? ''}`.replace(/\/$/, ''),
-            locations: Object.entries(web.locations ?? {}).map(function ([matchString, location]) {
+            locations: Object.entries(web.locations).map(function ([matchString, location]) {
                 return {
                     matchString,
-                    matchType: matchString.startsWith('^')
-                        ? 'regex'
-                        : matchString.startsWith('/')
-                            ? 'directory'
-                            : 'default',
+                    matchType: matchString.startsWith('^') ? 'regex' : matchString.startsWith('/') ? 'directory' : 'default',
                     locationType: location.allow ?? true ? 'generic' : 'blockAccess',
-                    mapScript: typeof (location.passthru ?? false) === 'string'
-                        ? location.passthru
-                        : '',
+                    mapScript: typeof (location.passthru ?? false) === 'string' ? location.passthru : '',
                     phpEnabled: false !== (location.passthru ?? false)
                 };
             }),
@@ -30589,7 +30585,7 @@ async function createVhost(webspace, web, app, domainName, phpVersion) {
             }
         },
         phpIni: {
-            values: transformPhpIni(app.php?.ini ?? {}, app.php?.extensions ?? [])
+            values: transformPhpIni(app.php.ini, app.php.extensions)
         }
     });
     if (null === response.result) {
@@ -30720,7 +30716,10 @@ async function createDatabaseUser(dbUserName, accountId = null) {
     if ('error' === (response.result.status ?? null)) {
         throw new Error(JSON.stringify(response.result.errors ?? []));
     }
-    return { user: response.result.response, password };
+    return {
+        user: response.result.response,
+        password
+    };
 }
 exports.createDatabaseUser = createDatabaseUser;
 function transformPhpIni(ini, extensions) {
@@ -30729,7 +30728,10 @@ function transformPhpIni(ini, extensions) {
             ini[`extension=${ext}.so`] = 'true';
         }
     }
-    return Object.entries(ini).map(([k, v]) => ({ key: k, value: `${v}` }));
+    return Object.entries(ini).map(([k, v]) => ({
+        key: k,
+        value: `${v}`
+    }));
 }
 function transformCronJob(config, phpVersion) {
     // Use default values so that _.isEqual comparison works
@@ -30825,16 +30827,36 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.config = void 0;
+exports.readConfig = void 0;
 const yaml = __importStar(__nccwpck_require__(1917));
 const fs_1 = __importDefault(__nccwpck_require__(7147));
-async function config(appKey) {
-    const manifest = yaml.load(fs_1.default.readFileSync('./.hosting/config.yaml', 'utf8'));
-    const app = manifest.applications[appKey] ?? null;
+async function readConfig(appKey) {
+    const config = Object.assign({}, yaml.load(fs_1.default.readFileSync('./.hosting/config.yaml', 'utf8')));
+    let app = null;
+    if (appKey in config.applications) {
+        app = Object.assign({
+            php: {
+                ini: {},
+                extensions: []
+            },
+            env: {},
+            relationships: {},
+            web: {
+                locations: {}
+            },
+            users: {},
+            cron: [],
+            sync: []
+        }, config.applications[appKey]);
+    }
     const envVars = app?.env ?? {};
-    return { manifest, app, envVars };
+    return {
+        config,
+        app,
+        envVars
+    };
 }
-exports.config = config;
+exports.readConfig = readConfig;
 
 
 /***/ }),
@@ -30885,24 +30907,30 @@ const api_client_1 = __nccwpck_require__(5707);
  */
 async function run() {
     try {
-        const appKey = core.getInput('app', { required: false });
+        const appKey = core.getInput('app', {
+            required: false
+        });
         const projectPrefix = core.getInput('project-prefix', {
             required: true
         });
         const shallSyncFiles = 'false' !== core.getInput('files');
         const shallSyncDatabases = 'false' !== core.getInput('databases');
         const syncDatabases = core.getInput('only-databases').split(' ');
-        const { manifest, app } = await (0, config_1.config)(appKey);
-        let fromEnv = core.getInput('from', { required: false });
-        const toEnv = core.getInput('to', { required: true });
+        const { config, app } = await (0, config_1.readConfig)(appKey);
+        let fromEnv = core.getInput('from', {
+            required: false
+        });
+        const toEnv = core.getInput('to', {
+            required: true
+        });
         if ('' === fromEnv) {
-            fromEnv = manifest.project?.parent ?? '';
+            fromEnv = config.project?.parent ?? '';
         }
         if ('' === fromEnv || '' === toEnv) {
-            core.info('Sync destinations were not specified and cannot be derived. Please check the `project.parent` config in your manifest file.');
+            core.info('Sync destinations were not specified and cannot be derived. Please check the `project.parent` config in the ".hosting/config.yaml" file.');
         }
         if (shallSyncFiles) {
-            for (const [appName, app1] of Object.entries(manifest.applications)) {
+            for (const [appName, app1] of Object.entries(config.applications)) {
                 if ('' !== appKey && appName !== appKey) {
                     continue;
                 }
@@ -30943,14 +30971,13 @@ async function run() {
         }
         else if (null !== app) {
             for (const dbName of Object.values(app.relationships ?? {}).filter(d => 'database' === d.split(':')[0] &&
-                (syncDatabases.length === 0 ||
-                    syncDatabases.includes(d.split(':')[1] ?? appKey)))) {
+                (syncDatabases.length === 0 || syncDatabases.includes(d.split(':')[1] ?? appKey)))) {
                 dbQueries.push(`${projectPrefix}-${fromEnv}-${dbName}`);
                 dbQueries.push(`${projectPrefix}-${toEnv}-${dbName}`);
             }
         }
         else {
-            throw new Error(`Cannot find "applications.${appKey}" in the ".hosting/config.yaml" manifest.`);
+            throw new Error(`Cannot find "applications.${appKey}" in the ".hosting/config.yaml" file.`);
         }
         if (!dbQueries.length) {
             return;

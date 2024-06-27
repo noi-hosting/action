@@ -1,7 +1,5 @@
 name: Deploy to Hosting.de
-description:
-  Sets ups web-spaces on Hosting.de, persists environment variables and syncs
-  contents among environments.
+description: Sets ups web-spaces on Hosting.de, persists environment variables and syncs contents among environments.
 branding:
   icon: 'arrow-right-circle'
   color: 'gray-dark'
@@ -11,13 +9,12 @@ inputs:
     required: true
   app:
     description:
-      You can only deploy one app on a time, provide the key of the current
-      application in the yaml manifest.
+      You can only deploy one app on a time, provide the key of the current application defined in the config file.
     default: app
   project-prefix:
     description:
-      A prefix used to identify resources on Hosting.de. Must be kept unique
-      under all projects under the account. Keep it short, e.g. `project1`
+      A prefix used to identify resources on Hosting.de. Must be kept unique under all projects under the account. Keep
+      it short, e.g. `project1`
     required: true
   ssh-public-key:
     description: The SSH public key for deploying.
@@ -79,9 +76,7 @@ runs:
 
     # Sync app
     - name: Sync environments
-      if:
-        ${{ steps.hosting.outputs.sync-files ||
-        steps.hosting.outputs.sync-databases }}
+      if: ${{ steps.hosting.outputs.sync-files || steps.hosting.outputs.sync-databases }}
       uses: richardhj/setup-hostingde/sync@main
       with:
         auth-token: ${{ inputs.auth-token }}
@@ -89,8 +84,7 @@ runs:
         ssh-private-key: ${{ inputs.ssh-private-key }}
         to: ${{ github.ref_name }}
         files: ${{ steps.hosting.outputs.sync-files }}
-        databases:
-          ${{ steps.hosting.outputs.sync-databases && 'true' || 'false' }}
+        databases: ${{ steps.hosting.outputs.sync-databases && 'true' || 'false' }}
         only-databases: ${{ steps.hosting.outputs.sync-databases }}
 
     # We need jq for json processing
@@ -141,10 +135,7 @@ runs:
       uses: deployphp/action@v1
       with:
         dep:
-          deploy -o remote_user=${{ steps.hosting.outputs.ssh-user }} -o
-          hostname=${{ steps.hosting.outputs.ssh-host }} -o port=${{
-          steps.hosting.outputs.ssh-port }} -o http_user=${{
-          steps.hosting.outputs.http-user }} -o deploy_path=${{
-          steps.hosting.outputs.deploy-path }} -o web_url=${{
-          steps.hosting.outputs.public-url }}
+          deploy -o remote_user=${{ steps.hosting.outputs.ssh-user }} -o hostname=${{ steps.hosting.outputs.ssh-host }}
+          -o port=${{ steps.hosting.outputs.ssh-port }} -o http_user=${{ steps.hosting.outputs.http-user }} -o
+          deploy_path=${{ steps.hosting.outputs.deploy-path }} -o web_url=${{ steps.hosting.outputs.public-url }}
         private-key: ${{ inputs.ssh-private-key }}

@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "config.schema.json",
+  "title": "Config schema",
+  "description": "Schema for .hosting/config.yaml file",
+  "type": "object",
+  "properties": {
+    "project": {
+      "description": "",
+      "type": "object",
+      "properties": {
+        "parent": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string",
+          "examples": ["{app}-{ref}.preview.example.com"]
+        },
+        "prune": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "required": ["parent", "domain"],
+      "additionalProperties": false
+    },
+    "applications": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z0-9]+$"
+      },
+      "properties": {
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "pool": {
+              "type": "string"
+            },
+            "account": {
+              "type": "string"
+            },
+            "php": {
+              "type": "object",
+              "properties": {
+                "version": {
+                  "type": "string",
+                  "pattern": "^\\d\\.\\d$"
+                },
+                "extensions": {
+                  "type": "array",
+                  "items": {
+                    "type": {
+                      "enum": ["apcu", "imagick", "memcached", "oauth", "redis"]
+                    }
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                "ini": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "propertyNames": {
+                    "pattern": "^[a-z:._]+$"
+                  }
+                }
+              },
+              "additionalProperties": false,
+              "required": ["version"]
+            },
+            "env": {
+              "type": "object",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[A-Za-z0-9-_]+$"
+              }
+            },
+            "relationships": {
+              "type": "object",
+              "minProperties": 1,
+              "propertyNames": {
+                "pattern": "^[a-z0-9-_]+$"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^\\w+(:\\w+)?$"
+              }
+            },
+            "sync": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "web": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "root": {
+                    "type": "string"
+                  },
+                  "domainName": {
+                    "type": "string"
+                  },
+                  "www": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "locations": {
+                    "type": "object",
+                    "minProperties": 1,
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "passthru": {
+                          "oneOf": [
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ],
+                          "default": false,
+                          "examples": ["/index.php", "/app.php"]
+                        },
+                        "expires": {
+                          "type": "string",
+                          "examples": ["1h"]
+                        },
+                        "allow": {
+                          "type": "boolean",
+                          "default": "true"
+                        }
+                      }
+                    }
+                  }
+                },
+                "required": ["locations"],
+                "additionalProperties": false
+              },
+              "minItems": 1
+            },
+            "cron": {
+              "type": "object",
+              "oneOf": [
+                {
+                  "properties": {
+                    "cmd": {
+                      "type": "string"
+                    },
+                    "required": ["cmd"]
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "php": {
+                      "type": "string"
+                    },
+                    "required": ["php"]
+                  },
+                  "additionalProperties": false
+                }
+              ],
+              "properties": {
+                "every": {
+                  "type": {
+                    "enum": [
+                      "1min",
+                      "5min",
+                      "10min",
+                      "15min",
+                      "30min",
+                      "1hour",
+                      "2hour",
+                      "3hour",
+                      "4hour",
+                      "6hour",
+                      "12hour",
+                      "day",
+                      "week",
+                      "month"
+                    ]
+                  }
+                },
+                "on": {
+                  "type": "string"
+                }
+              },
+              "required": ["every"],
+              "additionalProperties": false
+            },
+            "users": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^ssh-rsa .+$"
+              },
+              "minProperties": 1
+            }
+          },
+          "required": ["php"],
+          "additionalProperties": false
+        },
+        "minProperties": 1
+      }
+    },
+    "databases": {
+      "type": "object",
+      "properties": {
+        "schemas": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^\\w+$"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "endpoints": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "pattern": "^[a-z0-9]+$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^\\w+(:(admin|ro|rw))?$"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "required": ["project", "applications"]
+  },
+  "additionalProperties": false
+}

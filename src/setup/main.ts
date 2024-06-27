@@ -3,7 +3,7 @@
 import * as core from '@actions/core'
 import * as services from './services'
 import * as process from 'node:process'
-import { config } from '../config'
+import { readConfig } from '../config'
 
 /**
  * The main function for the action.
@@ -13,17 +13,17 @@ export async function run(): Promise<void> {
   try {
     // https://github.com/actions/toolkit/issues/1315
     const ref = process.env.GITHUB_REF_NAME ?? 'na'
-    const appKey: string = core.getInput('app', { required: true })
+    const appKey: string = core.getInput('app', {
+      required: true
+    })
     const projectPrefix: string = core.getInput('project-prefix', {
       required: true
     })
     const webspaceName: string = `${projectPrefix}-${ref}-${appKey}`.trim()
     const databasePrefix: string = `${projectPrefix}-${ref}`.trim()
-    const { manifest, app, envVars: env1 } = await config(appKey)
+    const { config, app, envVars: env1 } = await readConfig(appKey)
     if (null === app) {
-      throw new Error(
-        `Cannot find "applications.${appKey}" in the ".hosting/config.yaml" manifest.`
-      )
+      throw new Error(`Cannot find "applications.${appKey}" in the ".hosting/config.yaml" file.`)
     }
 
     const {
@@ -35,14 +35,15 @@ export async function run(): Promise<void> {
       envVars: env2
     } = await services.getWebspace(webspaceName, app)
 
-    const { destinations, phpVersion, phpExtensions } =
-      await services.applyVhosts(webspace, app, manifest, ref, appKey, httpUser)
-    const { newDatabases, envVars: env3 } = await services.applyDatabases(
-      databasePrefix,
-      appKey,
+    const { destinations, phpVersion, phpExtensions } = await services.applyVhosts(
+      webspace,
       app,
-      manifest
+      config,
+      ref,
+      appKey,
+      httpUser
     )
+    const { newDatabases, envVars: env3 } = await services.applyDatabases(databasePrefix, appKey, app, config)
 
     core.setOutput('sync-files', isNewWebspace)
     core.setOutput('sync-databases', newDatabases.join(' '))
@@ -56,7 +57,7 @@ export async function run(): Promise<void> {
     core.setOutput('deploy-path', destinations[0].deployPath)
     core.setOutput('public-url', destinations[0].publicUrl)
 
-    if (manifest.project?.prune ?? true) {
+    if (config.project?.prune ?? true) {
       await services.pruneBranches(projectPrefix)
     }
   } catch (error) {

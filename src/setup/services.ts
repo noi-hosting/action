@@ -4,7 +4,7 @@ import process from 'node:process'
 import { wait } from '../wait'
 import * as _ from 'lodash'
 import crypto from 'crypto'
-import { Manifest, ManifestApp, ManifestAppWeb } from '../config'
+import { Config, AppConfig, WebConfig } from '../config'
 import {
   DatabaseResult,
   transformCronJob,
@@ -17,26 +17,23 @@ import {
 
 export async function getWebspace(
   webspaceName: string,
-  app: ManifestApp
+  app: AppConfig
 ): Promise<{
   webspace: WebspaceResult
   isNew: boolean
   sshUser: string
   sshHost: string
   httpUser: string
-  envVars: { [key: string]: string | boolean | number }
+  envVars: {
+    [key: string]: string | boolean | number
+  }
 }> {
-  const { webspace, webspaceAccess, isNew } = await findOrCreateWebspace(
-    webspaceName,
-    app
-  )
+  const { webspace, webspaceAccess, isNew } = await findOrCreateWebspace(webspaceName, app)
+  const envVars: {
+    [key: string]: string | boolean | number
+  } = {}
 
-  const envVars: { [key: string]: string | boolean | number } = {}
-
-  const redisRelationName =
-    Object.keys(app.relationships ?? {}).find(
-      key => 'redis' === (app.relationships ?? {})[key]
-    ) ?? null
+  const redisRelationName = Object.keys(app.relationships).find(key => 'redis' === app.relationships[key]) ?? null
   if (null !== redisRelationName) {
     envVars[`${redisRelationName.replace('-', '_').toUpperCase()}_URL`] =
       `redis:///run/redis-${webspace.webspaceName}/sock`
@@ -54,8 +51,8 @@ export async function getWebspace(
 
 export async function applyVhosts(
   webspace: WebspaceResult,
-  app: ManifestApp,
-  manifest: Manifest,
+  app: AppConfig,
+  config: Config,
   ref: string,
   appKey: string,
   httpUser: string
@@ -64,26 +61,14 @@ export async function applyVhosts(
   phpVersion: string
   phpExtensions: string[]
 }> {
-  const foundVhosts: VhostResult[] = await client.findVhostByWebspace(
-    webspace.id
-  )
+  const foundVhosts: VhostResult[] = await client.findVhostByWebspace(webspace.id)
 
   const destinations = []
   const phpVersion = app.php.version
-  const phpExtensions = app.php.extensions ?? []
+  const phpExtensions = app.php.extensions
 
-  for (const [domainKey, web] of Object.entries(app.web)) {
-    const { domainName } = await configureVhosts(
-      domainKey,
-      web,
-      app,
-      ref,
-      manifest,
-      appKey,
-      foundVhosts,
-      webspace,
-      phpVersion
-    )
+  for (const web of app.web) {
+    const { domainName } = await configureVhosts(web, app, ref, config, appKey, foundVhosts, webspace, phpVersion)
 
     destinations.push({
       deployPath: `/home/${httpUser}/html`,
@@ -91,39 +76,41 @@ export async function applyVhosts(
     })
   }
 
-  await pruneVhosts(foundVhosts, app, ref, manifest, appKey)
+  await pruneVhosts(foundVhosts, app, ref, config, appKey)
 
-  return { destinations, phpVersion, phpExtensions }
+  return {
+    destinations,
+    phpVersion,
+    phpExtensions
+  }
 }
 
 export async function applyDatabases(
   databasePrefix: string,
   appKey: string,
-  app: ManifestApp,
-  manifest: Manifest
+  app: AppConfig,
+  config: Config
 ): Promise<{
   newDatabases: string[]
-  envVars: { [key: string]: string | boolean | number }
+  envVars: {
+    [key: string]: string | boolean | number
+  }
 }> {
   const envVars = {}
   const foundDatabases = await client.findDatabases(`${databasePrefix}-*`)
 
-  const { newDatabases } = await configureDatabases(
-    manifest,
-    app,
-    databasePrefix,
-    appKey,
-    foundDatabases,
-    envVars
-  )
-  await pruneDatabases(manifest, databasePrefix, foundDatabases)
+  const { newDatabases } = await configureDatabases(config, app, databasePrefix, appKey, foundDatabases, envVars)
+  await pruneDatabases(config, databasePrefix, foundDatabases)
 
-  return { newDatabases, envVars }
+  return {
+    newDatabases,
+    envVars
+  }
 }
 
 export async function findOrCreateWebspace(
   webspaceName: string,
-  app: ManifestApp
+  app: AppConfig
 ): Promise<{
   webspace: WebspaceResult
   webspaceAccess: WebspaceAccess
@@ -134,12 +121,11 @@ export async function findOrCreateWebspace(
     throw new Error(`Please specify "app.<APP_NAME>.php.version`)
   }
 
-  const redisEnabled = Object.values(app.relationships ?? {}).includes('redis')
-  let webspace: WebspaceResult | null =
-    await client.findOneWebspaceByName(webspaceName)
+  const redisEnabled = Object.values(app.relationships).includes('redis')
+  let webspace: WebspaceResult | null = await client.findOneWebspaceByName(webspaceName)
 
   const additionalUsers = []
-  for (const [displayName, key] of Object.entries(app.users ?? [])) {
+  for (const [displayName, key] of Object.entries(app.users)) {
     if (!key.startsWith('ssh-rsa ') || key.split(' ').length > 3) {
       console.error(`SSH key under "${displayName} is not supported`)
       continue
@@ -153,18 +139,17 @@ export async function findOrCreateWebspace(
   }
 
   const availUsers = await client.findUsersByName(
-    [`github-action--${webspaceName}`].concat(
-      additionalUsers.map(x => x.displayName)
-    )
+    [`github-action--${webspaceName}`].concat(additionalUsers.map(x => x.displayName))
   )
 
-  let ghUser =
-    availUsers.find(u => u.name === `github-action--${webspaceName}`) ?? null
+  let ghUser = availUsers.find(u => u.name === `github-action--${webspaceName}`) ?? null
   const users: UserResult[] = []
   if (null === ghUser) {
     ghUser = await client.createWebspaceUser(
       `github-action--${webspaceName}`,
-      core.getInput('ssh-public-key', { required: true })
+      core.getInput('ssh-public-key', {
+        required: true
+      })
     )
   }
 
@@ -184,7 +169,7 @@ export async function findOrCreateWebspace(
       // Cronjobs are unchanged
       _.isEqual(
         webspace.cronJobs,
-        (app.cron ?? []).map(c => transformCronJob(c, phpv))
+        app.cron.map(c => transformCronJob(c, phpv))
       ) &&
       // Redis is unchanged
       _.isEqual(redisEnabled, webspace.redisEnabled ?? false) &&
@@ -200,23 +185,19 @@ export async function findOrCreateWebspace(
     } else {
       core.info(`Updating webspace ${webspaceName} (${webspace.id})`)
 
-      webspace = await client.updateWebspace(
-        webspace,
-        users,
-        phpv,
-        app.cron,
-        redisEnabled,
-        app.disk ?? 10240
-      )
+      webspace = await client.updateWebspace(webspace, users, phpv, app.cron, redisEnabled, app.disk ?? 10240)
     }
 
-    const webspaceAccess =
-      webspace.accesses.find(a => (ghUser.id = a.userId)) ?? null
+    const webspaceAccess = webspace.accesses.find(a => (ghUser.id = a.userId)) ?? null
     if (null === webspaceAccess) {
       throw new Error(`Unexpected error`)
     }
 
-    return { webspace, webspaceAccess, isNew: false }
+    return {
+      webspace,
+      webspaceAccess,
+      isNew: false
+    }
   }
 
   core.info('Creating a new webspace...')
@@ -224,7 +205,7 @@ export async function findOrCreateWebspace(
   webspace = await client.createWebspace(
     webspaceName,
     users,
-    app.cron ?? [],
+    app.cron,
     phpv,
     app.pool ?? null,
     app.account ?? null,
@@ -234,90 +215,75 @@ export async function findOrCreateWebspace(
 
   do {
     await wait(2000)
-    core.info(
-      `Waiting for webspace ${webspaceName} (${webspace.id}) to boot...`
-    )
+    core.info(`Waiting for webspace ${webspaceName} (${webspace.id}) to boot...`)
     webspace = await client.findWebspaceById(webspace.id)
     if (null === webspace) {
       throw new Error(`Unexpected error.`)
     }
   } while ('active' !== webspace.status)
 
-  const webspaceAccess =
-    webspace.accesses.find(a => (ghUser.id = a.userId)) ?? null
+  const webspaceAccess = webspace.accesses.find(a => (ghUser.id = a.userId)) ?? null
   if (null === webspaceAccess) {
     throw new Error(`Unexpected error`)
   }
 
-  return { webspace, webspaceAccess, isNew: true }
+  return {
+    webspace,
+    webspaceAccess,
+    isNew: true
+  }
 }
 
-export async function getWebspaceAccess(
-  webspace: WebspaceResult
-): Promise<WebspaceAccess> {
+export async function getWebspaceAccess(webspace: WebspaceResult): Promise<WebspaceAccess> {
   const availableUsers = await client.findUsersByName('github-action--*')
-  const webspaceAccess =
-    webspace.accesses.find(a => availableUsers.find(u => u.id === a.userId)) ??
-    null
+  const webspaceAccess = webspace.accesses.find(a => availableUsers.find(u => u.id === a.userId)) ?? null
 
   if (null === webspaceAccess) {
-    throw new Error(
-      `It seems that the SSH access to the webspace was revoked for the github-action.`
-    )
+    throw new Error(`It seems that the SSH access to the webspace was revoked for the github-action.`)
   }
 
   return webspaceAccess
 }
 
 export async function configureVhosts(
-  domainName: string,
-  web: ManifestAppWeb,
-  app: ManifestApp,
+  web: WebConfig,
+  app: AppConfig,
   ref: string,
-  manifest: Manifest,
+  config: Config,
   appKey: string,
   foundVhosts: VhostResult[],
   webspace: WebspaceResult,
   phpVersion: string
-): Promise<{ domainName: string }> {
-  const actualDomainName = translateDomainName(
-    domainName,
-    ref,
-    manifest,
-    appKey
-  )
+): Promise<{
+  domainName: string
+}> {
+  const actualDomainName = translateDomainName(web.domainName ?? null, ref, config, appKey)
 
   let vhost = foundVhosts.find(v => v.domainName === actualDomainName) ?? null
   if (null === vhost) {
     core.info(`Configuring ${actualDomainName}...`)
-    vhost = await client.createVhost(
-      webspace,
-      web,
-      app,
-      actualDomainName,
-      phpVersion
-    )
+    vhost = await client.createVhost(webspace, web, app, actualDomainName, phpVersion)
   } else if (mustBeUpdated(vhost, app, web)) {
     core.info(`Configuring ${actualDomainName}...`)
     // todo
   }
 
-  return { domainName: actualDomainName }
+  return {
+    domainName: actualDomainName
+  }
 }
 
 export async function pruneVhosts(
   foundVhosts: VhostResult[],
-  app: ManifestApp,
+  app: AppConfig,
   ref: string,
-  manifest: Manifest,
+  config: Config,
   appKey: string
 ): Promise<void> {
   for (const relict of foundVhosts.filter(
     v =>
       !Object.keys(app.web)
-        .map(domainName =>
-          translateDomainName(domainName, ref, manifest, appKey)
-        )
+        .map(domainName => translateDomainName(domainName, ref, config, appKey))
         .includes(v.domainName)
   )) {
     core.info(`Deleting ${relict.domainName}...`)
@@ -327,27 +293,27 @@ export async function pruneVhosts(
 }
 
 export async function configureDatabases(
-  manifest: Manifest,
-  app: ManifestApp,
+  config: Config,
+  app: AppConfig,
   databasePrefix: string,
   appKey: string,
   foundDatabases: DatabaseResult[],
   envVars: object
-): Promise<{ newDatabases: string[] }> {
+): Promise<{
+  newDatabases: string[]
+}> {
   const newDatabases = []
-  for (const [relationName, relation] of Object.entries(
-    app.relationships ?? {}
-  ).filter(([, v]) => v.split(':')[0] === 'database')) {
+  for (const [relationName, relation] of Object.entries(app.relationships).filter(
+    ([, v]) => 'database' === v.split(':')[0]
+  )) {
     const endpointName = relation.split(':')[1] ?? appKey
-    const endpoint = manifest.databases?.endpoints[endpointName] ?? null
+    const endpoint = config.databases?.endpoints[endpointName] ?? null
     if (null === endpoint) {
       throw new Error(`Could not find "databases.endpoint.${endpointName}"`)
     }
     const [schema, privileges] = endpoint.split(':')
-    if (!(manifest.databases?.schemas ?? []).includes(schema)) {
-      throw new Error(
-        `Could not find schema "${schema}" under "databases.schemas"`
-      )
+    if (!(config.databases?.schemas ?? []).includes(schema)) {
+      throw new Error(`Could not find schema "${schema}" under "databases.schemas"`)
     }
 
     const databaseInternalName = `${databasePrefix}-${schema.toLowerCase()}`
@@ -355,22 +321,14 @@ export async function configureDatabases(
 
     core.info(`Processing database "${schema}" for relation "${relationName}"`)
 
-    const existingDatabase =
-      foundDatabases.find(d => d.name === databaseInternalName) ?? null
+    const existingDatabase = foundDatabases.find(d => d.name === databaseInternalName) ?? null
     if (null !== existingDatabase) {
-      const usersWithAccess = await client.findDatabaseAccesses(
-        dbUserName,
-        existingDatabase.id
-      )
+      const usersWithAccess = await client.findDatabaseAccesses(dbUserName, existingDatabase.id)
       if (usersWithAccess.length) {
         core.info(`Database already in use (${databaseInternalName})`)
 
-        const access = existingDatabase.accesses.find(
-          a => a.userId === usersWithAccess[0].id
-        )
-        if (
-          (privileges ?? 'admin') !== getPrivileges(access?.accessLevel ?? [])
-        ) {
+        const access = existingDatabase.accesses.find(a => a.userId === usersWithAccess[0].id)
+        if ((privileges ?? 'admin') !== getPrivileges(access?.accessLevel ?? [])) {
           await client.updateDatabase(
             existingDatabase,
             existingDatabase.accesses.map(a => {
@@ -384,13 +342,11 @@ export async function configureDatabases(
       } else {
         core.info(`Granting access on database ${databaseInternalName}`)
 
-        const { user: dbUser, password: databasePassword } =
-          await client.createDatabaseUser(dbUserName, app.account ?? null)
-        const { database, dbLogin } = await client.addDatabaseAccess(
-          existingDatabase,
-          dbUser,
-          privileges ?? ''
+        const { user: dbUser, password: databasePassword } = await client.createDatabaseUser(
+          dbUserName,
+          app.account ?? null
         )
+        const { database, dbLogin } = await client.addDatabaseAccess(existingDatabase, dbUser, privileges ?? '')
 
         defineEnv(envVars, relationName, database, dbLogin, databasePassword)
       }
@@ -401,11 +357,7 @@ export async function configureDatabases(
         database: createdDatabase,
         databaseUserName,
         databasePassword
-      } = await client.createDatabase(
-        dbUserName,
-        databaseInternalName,
-        app.pool ?? null
-      )
+      } = await client.createDatabase(dbUserName, databaseInternalName, app.pool ?? null)
 
       let database: DatabaseResult | null = createdDatabase
       do {
@@ -419,17 +371,13 @@ export async function configureDatabases(
 
       newDatabases.push(schema)
 
-      defineEnv(
-        envVars,
-        relationName,
-        database,
-        databaseUserName,
-        databasePassword
-      )
+      defineEnv(envVars, relationName, database, databaseUserName, databasePassword)
     }
   }
 
-  return { newDatabases }
+  return {
+    newDatabases
+  }
 }
 
 function defineEnv(
@@ -461,16 +409,13 @@ function defineEnv(
 }
 
 export async function pruneDatabases(
-  manifest: Manifest,
+  config: Config,
   databasePrefix: string,
   foundDatabases: DatabaseResult[]
 ): Promise<void> {
-  const allDatabaseNames = manifest.databases?.schemas ?? []
+  const allDatabaseNames = config.databases?.schemas ?? []
   for (const relict of foundDatabases.filter(
-    v =>
-      !allDatabaseNames
-        .map(n => `${databasePrefix}-${n.toLowerCase()}`)
-        .includes(v.name)
+    v => !allDatabaseNames.map(n => `${databasePrefix}-${n.toLowerCase()}`).includes(v.name)
   )) {
     core.info(`Deleting database ${relict.name}`)
 
@@ -495,9 +440,7 @@ export async function pruneBranches(projectPrefix: string): Promise<void> {
       core.info(`Deleting webspace ${webspace.name}`)
       await client.deleteWebspaceById(webspace.id)
 
-      const databases = await client.findDatabases(
-        `${projectPrefix}-${match[1]}-*`.trim()
-      )
+      const databases = await client.findDatabases(`${projectPrefix}-${match[1]}-*`.trim())
       for (const d of databases) {
         core.info(`Deleting database ${d.name}`)
         await client.deleteDatabaseById(d.id)
@@ -506,29 +449,21 @@ export async function pruneBranches(projectPrefix: string): Promise<void> {
   }
 }
 
-function translateDomainName(
-  domainName: string,
-  environment: string,
-  manifest: Manifest,
-  app: string
-): string {
-  if ('_' === domainName) {
+function translateDomainName(domainName: string | null, environment: string, config: Config, app: string): string {
+  if (null === domainName) {
     domainName = process.env.DOMAIN_NAME ?? ''
   }
 
-  const previewDomain = manifest.project?.domain ?? null
-  if (
-    null !== previewDomain &&
-    ('' === domainName || environment !== (manifest.project?.parent ?? ''))
-  ) {
+  const previewDomain = config.project?.domain ?? null
+  if (null !== previewDomain && ('' === domainName || environment !== (config.project?.parent ?? ''))) {
     domainName = previewDomain
   }
 
   if ('' === domainName) {
     throw new Error(
       `No domain name configured for the app defined under "applications.${app}". ` +
-        `Please provide the variable "DOMAIN_NAME" under Github's environment settings. ` +
-        `Alternatively, set the domain name via "applications.${app}.web.locations[_]".`
+        `Please provide the a variable named "DOMAIN_NAME" under Github's environment settings. ` +
+        `Alternatively, set the domain name via "applications.${app}.web.locations[].domainName".`
     )
   }
   // POC
@@ -540,11 +475,7 @@ function translateDomainName(
 }
 
 function getPrivileges(accessLevel: string[]): string {
-  if (
-    accessLevel.includes('read') &&
-    accessLevel.includes('write') &&
-    accessLevel.includes('schema')
-  ) {
+  if (accessLevel.includes('read') && accessLevel.includes('write') && accessLevel.includes('schema')) {
     return 'admin'
   }
   if (accessLevel.includes('read') && accessLevel.includes('write')) {
@@ -557,11 +488,7 @@ function getPrivileges(accessLevel: string[]): string {
   throw new Error(`Access level "${JSON.stringify(accessLevel)}" unknown.`)
 }
 
-function mustBeUpdated(
-  vhost: VhostResult,
-  app: ManifestApp,
-  web: ManifestAppWeb
-): boolean {
+function mustBeUpdated(vhost: VhostResult, app: AppConfig, web: WebConfig): boolean {
   const phpv = app.php?.version ?? process.env.PHP_VERSION ?? null
   if (phpv && phpv !== vhost.phpVersion) {
     return true

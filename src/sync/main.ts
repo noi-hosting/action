@@ -3,7 +3,7 @@
 import * as core from '@actions/core'
 import { exec } from '@actions/exec'
 import * as client from '../api-client'
-import { config } from '../config'
+import { readConfig } from '../config'
 import crypto from 'crypto'
 import { findDatabases } from '../api-client'
 
@@ -13,7 +13,9 @@ import { findDatabases } from '../api-client'
  */
 export async function run(): Promise<void> {
   try {
-    const appKey: string = core.getInput('app', { required: false })
+    const appKey: string = core.getInput('app', {
+      required: false
+    })
     const projectPrefix: string = core.getInput('project-prefix', {
       required: true
     })
@@ -21,36 +23,34 @@ export async function run(): Promise<void> {
     const shallSyncDatabases: boolean = 'false' !== core.getInput('databases')
     const syncDatabases: string[] = core.getInput('only-databases').split(' ')
 
-    const { manifest, app } = await config(appKey)
+    const { config, app } = await readConfig(appKey)
 
-    let fromEnv = core.getInput('from', { required: false })
-    const toEnv = core.getInput('to', { required: true })
+    let fromEnv = core.getInput('from', {
+      required: false
+    })
+    const toEnv = core.getInput('to', {
+      required: true
+    })
     if ('' === fromEnv) {
-      fromEnv = manifest.project?.parent ?? ''
+      fromEnv = config.project?.parent ?? ''
     }
 
     if ('' === fromEnv || '' === toEnv) {
       core.info(
-        'Sync destinations were not specified and cannot be derived. Please check the `project.parent` config in your manifest file.'
+        'Sync destinations were not specified and cannot be derived. Please check the `project.parent` config in the ".hosting/config.yaml" file.'
       )
     }
 
     if (shallSyncFiles) {
-      for (const [appName, app1] of Object.entries(manifest.applications)) {
+      for (const [appName, app1] of Object.entries(config.applications)) {
         if ('' !== appKey && appName !== appKey) {
           continue
         }
 
-        const fromWebspace = await client.findOneWebspaceByName(
-          `${projectPrefix}-${fromEnv}-${appName}`
-        )
-        const toWebspace = await client.findOneWebspaceByName(
-          `${projectPrefix}-${toEnv}-${appName}`
-        )
+        const fromWebspace = await client.findOneWebspaceByName(`${projectPrefix}-${fromEnv}-${appName}`)
+        const toWebspace = await client.findOneWebspaceByName(`${projectPrefix}-${toEnv}-${appName}`)
         if (null === fromWebspace) {
-          core.info(
-            `The webspace for app ${appName} is not present in the ${fromEnv} environment. Skipping.`
-          )
+          core.info(`The webspace for app ${appName} is not present in the ${fromEnv} environment. Skipping.`)
           continue
         }
         if (null === toWebspace) {
@@ -74,9 +74,7 @@ export async function run(): Promise<void> {
       return
     }
 
-    core.info(
-      `Syncing databases from environment "${fromEnv}" to environment "${toEnv}"`
-    )
+    core.info(`Syncing databases from environment "${fromEnv}" to environment "${toEnv}"`)
 
     const dbQueries: string[] = []
     if ('' === appKey) {
@@ -93,16 +91,13 @@ export async function run(): Promise<void> {
       for (const dbName of Object.values(app.relationships ?? {}).filter(
         d =>
           'database' === d.split(':')[0] &&
-          (syncDatabases.length === 0 ||
-            syncDatabases.includes(d.split(':')[1] ?? appKey))
+          (syncDatabases.length === 0 || syncDatabases.includes(d.split(':')[1] ?? appKey))
       )) {
         dbQueries.push(`${projectPrefix}-${fromEnv}-${dbName}`)
         dbQueries.push(`${projectPrefix}-${toEnv}-${dbName}`)
       }
     } else {
-      throw new Error(
-        `Cannot find "applications.${appKey}" in the ".hosting/config.yaml" manifest.`
-      )
+      throw new Error(`Cannot find "applications.${appKey}" in the ".hosting/config.yaml" file.`)
     }
 
     if (!dbQueries.length) {
@@ -122,8 +117,7 @@ export async function run(): Promise<void> {
     } = {}
 
     const dbUsername = `gh${crypto.randomInt(1000000, 9999999)}`
-    const { user: dbUser, password: dbPassword } =
-      await client.createDatabaseUser(dbUsername)
+    const { user: dbUser, password: dbPassword } = await client.createDatabaseUser(dbUsername)
 
     core.setSecret(dbPassword)
 
@@ -163,9 +157,7 @@ export async function run(): Promise<void> {
         continue
       }
 
-      core.info(
-        `Database "${migration.to.humanName}" will be overridden using database "${migration.from.humanName}"`
-      )
+      core.info(`Database "${migration.to.humanName}" will be overridden using database "${migration.from.humanName}"`)
 
       const filename = `${crypto.randomUUID()}.sql`
       await exec(
