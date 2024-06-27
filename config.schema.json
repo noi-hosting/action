@@ -165,38 +165,98 @@
             "type": "array",
             "items": {
               "type": "object",
-              "properties": {
-                "cmd": {
-                  "type": "string"
-                },
-                "php": {
-                  "type": "string"
-                },
-                "every": {
-                  "type": "string",
-                  "enum": [
-                    "1min",
-                    "5min",
-                    "10min",
-                    "15min",
-                    "30min",
-                    "1hour",
-                    "2hour",
-                    "3hour",
-                    "4hour",
-                    "6hour",
-                    "12hour",
-                    "day",
-                    "week",
-                    "month"
+              "allOf": [
+                {
+                  "oneOf": [
+                    {
+                      "properties": {
+                        "cmd": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "properties": {
+                        "php": {
+                          "type": "string"
+                        }
+                      }
+                    }
                   ]
                 },
-                "on": {
-                  "type": "string"
+                {
+                  "oneOf": [
+                    {
+                      "properties": {
+                        "every": {
+                          "type": "string",
+                          "enum": [
+                            "1min",
+                            "5min",
+                            "10min",
+                            "15min",
+                            "30min",
+                            "1hour",
+                            "2hour",
+                            "3hour",
+                            "4hour",
+                            "6hour",
+                            "12hour"
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "properties": {
+                        "every": {
+                          "const": "day"
+                        },
+                        "on": {
+                          "type": "string",
+                          "enum": [
+                            "1-5",
+                            "5-9",
+                            "9-13",
+                            "13-17",
+                            "17-21",
+                            "21-1"
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "properties": {
+                        "every": {
+                          "const": "week"
+                        },
+                        "on": {
+                          "type": "string",
+                          "enum": [
+                            "Mon",
+                            "Tue",
+                            "Wed",
+                            "Thu",
+                            "Fri",
+                            "Sat",
+                            "Sun"
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "properties": {
+                        "every": {
+                          "const": "month"
+                        },
+                        "on": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 31
+                        }
+                      }
+                    }
+                  ]
                 }
-              },
-              "required": [
-                "every"
               ],
               "additionalProperties": false
             },
