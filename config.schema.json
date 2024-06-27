@@ -258,11 +258,11 @@
         }
       },
       "additionalProperties": false
-    },
-    "required": [
-      "project",
-      "applications"
-    ]
+    }
   },
+  "required": [
+    "project",
+    "applications"
+  ],
   "additionalProperties": false
 }
