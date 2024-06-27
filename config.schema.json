@@ -14,14 +14,19 @@
         },
         "domain": {
           "type": "string",
-          "examples": ["{app}-{ref}.preview.example.com"]
+          "examples": [
+            "{app}-{ref}.preview.example.com"
+          ]
         },
         "prune": {
           "type": "boolean",
           "default": true
         }
       },
-      "required": ["parent", "domain"],
+      "required": [
+        "parent",
+        "domain"
+      ],
       "additionalProperties": false
     },
     "applications": {
@@ -49,9 +54,14 @@
                 "extensions": {
                   "type": "array",
                   "items": {
-                    "type": {
-                      "enum": ["apcu", "imagick", "memcached", "oauth", "redis"]
-                    }
+                    "type": "string",
+                    "enum": [
+                      "apcu",
+                      "imagick",
+                      "memcached",
+                      "oauth",
+                      "redis"
+                    ]
                   },
                   "minItems": 1,
                   "uniqueItems": true
@@ -65,7 +75,9 @@
                 }
               },
               "additionalProperties": false,
-              "required": ["version"]
+              "required": [
+                "version"
+              ]
             },
             "env": {
               "type": "object",
@@ -124,11 +136,16 @@
                             }
                           ],
                           "default": false,
-                          "examples": ["/index.php", "/app.php"]
+                          "examples": [
+                            "/index.php",
+                            "/app.php"
+                          ]
                         },
                         "expires": {
                           "type": "string",
-                          "examples": ["1h"]
+                          "examples": [
+                            "1h"
+                          ]
                         },
                         "allow": {
                           "type": "boolean",
@@ -138,7 +155,9 @@
                     }
                   }
                 },
-                "required": ["locations"],
+                "required": [
+                  "locations"
+                ],
                 "additionalProperties": false
               },
               "minItems": 1
@@ -151,7 +170,9 @@
                     "cmd": {
                       "type": "string"
                     },
-                    "required": ["cmd"]
+                    "required": [
+                      "cmd"
+                    ]
                   },
                   "additionalProperties": false
                 },
@@ -161,37 +182,40 @@
                     "php": {
                       "type": "string"
                     },
-                    "required": ["php"]
+                    "required": [
+                      "php"
+                    ]
                   },
                   "additionalProperties": false
                 }
               ],
               "properties": {
                 "every": {
-                  "type": {
-                    "enum": [
-                      "1min",
-                      "5min",
-                      "10min",
-                      "15min",
-                      "30min",
-                      "1hour",
-                      "2hour",
-                      "3hour",
-                      "4hour",
-                      "6hour",
-                      "12hour",
-                      "day",
-                      "week",
-                      "month"
-                    ]
-                  }
+                  "type": "string",
+                  "enum": [
+                    "1min",
+                    "5min",
+                    "10min",
+                    "15min",
+                    "30min",
+                    "1hour",
+                    "2hour",
+                    "3hour",
+                    "4hour",
+                    "6hour",
+                    "12hour",
+                    "day",
+                    "week",
+                    "month"
+                  ]
                 },
                 "on": {
                   "type": "string"
                 }
               },
-              "required": ["every"],
+              "required": [
+                "every"
+              ],
               "additionalProperties": false
             },
             "users": {
@@ -203,7 +227,9 @@
               "minProperties": 1
             }
           },
-          "required": ["php"],
+          "required": [
+            "php"
+          ],
           "additionalProperties": false
         },
         "minProperties": 1
@@ -235,7 +261,10 @@
       },
       "additionalProperties": false
     },
-    "required": ["project", "applications"]
+    "required": [
+      "project",
+      "applications"
+    ]
   },
   "additionalProperties": false
 }
