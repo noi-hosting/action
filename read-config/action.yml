@@ -1,6 +1,11 @@
 name: Read config
 description: ''
 
+inputs:
+  action-ref:
+    description: ''
+    default: ${{ github.action_ref }}
+
 outputs:
   apps:
     description: The keys configured under "applications.[]".
@@ -16,7 +21,7 @@ runs:
       uses: cardinalby/schema-validator-action@v3
       with:
         file: '.hosting/config.yaml'
-        schema: https://raw.githubusercontent.com/richardhj/setup-hostingde/${{ github.action_ref }}/config.schema.json
+        schema: https://raw.githubusercontent.com/richardhj/setup-hostingde/${{ inputs.action-ref }}/config.schema.json
 
     - name: Export app names
       uses: mikefarah/yq@master
