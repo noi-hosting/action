@@ -5,6 +5,8 @@ inputs:
   auth-token:
     description: The API authentication token, from the Hosting.de admin panel.
     required: true
+  gh-token:
+    description: The API authentication token, from the Hosting.de admin panel.
   app:
     description:
       You can only deploy one app on a time, provide the key of the current application defined in the config file.
@@ -145,6 +147,6 @@ runs:
           deploy -o remote_user=${{ steps.hosting.outputs.ssh-user }} -o hostname=${{ steps.hosting.outputs.ssh-host }}
           -o port=${{ steps.hosting.outputs.ssh-port }} -o http_user=${{ steps.hosting.outputs.http-user }} -o
           deploy_path=${{ steps.hosting.outputs.deploy-path }} -o web_url=${{ steps.hosting.outputs.public-url }} -o
-          forward_agent=false -o repository=https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{
+          forward_agent=false -o repository=https://x-access-token:${{ inputs.gh-token }}@github.com/${{
           github.repository }}.git
         private-key: ${{ inputs.ssh-private-key }}
