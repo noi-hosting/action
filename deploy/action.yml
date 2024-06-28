@@ -1,8 +1,6 @@
 name: Deploy to Hosting.de
 description: Sets ups web-spaces on Hosting.de, persists environment variables and syncs contents among environments.
-branding:
-  icon: 'arrow-right-circle'
-  color: 'gray-dark'
+
 inputs:
   auth-token:
     description: The API authentication token, from the Hosting.de admin panel.
@@ -30,6 +28,8 @@ inputs:
     required: true
   build:
     description: Shell script for building environment before deployment
+  with-node:
+    description: The node version, if your build hook uses node at all.
 
 outputs:
   public-url:
@@ -125,6 +125,13 @@ runs:
         php-version: ${{ steps.hosting.outputs.php-version }}
         extensions: ${{ steps.hosting.outputs.php-extensions }}
 
+    # Not all apps use node, but it is a very common use case
+    - name: Setup Node
+      if: ${{ inputs.with-node }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.with-node }}
+
     # Run build hook
     - name: Run build hook
       shell: bash
@@ -137,5 +144,7 @@ runs:
         dep:
           deploy -o remote_user=${{ steps.hosting.outputs.ssh-user }} -o hostname=${{ steps.hosting.outputs.ssh-host }}
           -o port=${{ steps.hosting.outputs.ssh-port }} -o http_user=${{ steps.hosting.outputs.http-user }} -o
-          deploy_path=${{ steps.hosting.outputs.deploy-path }} -o web_url=${{ steps.hosting.outputs.public-url }}
+          deploy_path=${{ steps.hosting.outputs.deploy-path }} -o web_url=${{ steps.hosting.outputs.public-url }} -o
+          forward_agent=false -o repository=https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{
+          github.repository }}.git
         private-key: ${{ inputs.ssh-private-key }}
