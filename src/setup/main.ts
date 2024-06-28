@@ -26,6 +26,11 @@ export async function run(): Promise<void> {
       throw new Error(`Cannot find "applications.${appKey}" in the ".hosting/config.yaml" file.`)
     }
 
+    // Export environment variables for build hook
+    for (const [k, v] of Object.entries(env1)) {
+      core.exportVariable(k, v)
+    }
+
     const {
       webspace,
       isNew: isNewWebspace,

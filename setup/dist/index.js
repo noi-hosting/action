@@ -46906,6 +46906,10 @@ async function run() {
         if (null === app) {
             throw new Error(`Cannot find "applications.${appKey}" in the ".hosting/config.yaml" file.`);
         }
+        // Export environment variables for build hook
+        for (const [k, v] of Object.entries(env1)) {
+            core.exportVariable(k, v);
+        }
         const { webspace, isNew: isNewWebspace, sshHost, sshUser, httpUser, envVars: env2 } = await services.getWebspace(webspaceName, app);
         const { destinations, phpVersion, phpExtensions } = await services.applyVhosts(webspace, app, config, ref, appKey, httpUser);
         const { newDatabases, envVars: env3 } = await services.applyDatabases(databasePrefix, appKey, app, config);
