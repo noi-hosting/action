@@ -1,0 +1,25 @@
+name: Read config
+description: ''
+
+outputs:
+  app-names:
+    description: The keys configured under "applications.[]".
+    value: ${{ steps.apps.outputs.result }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check schema
+      uses: cardinalby/schema-validator-action@v3
+      with:
+        file: '.hosting/config.yaml'
+        schema: https://raw.githubusercontent.com/richardhj/setup-hostingde/${{ github.action_ref }}/config.schema.json
+
+    - name: Export app names
+      uses: mikefarah/yq@master
+      id: apps
+      with:
+        cmd: yq -o=json '.applications | keys' '.hosting/config.yaml'
