@@ -6,7 +6,8 @@ inputs:
     description: The API authentication token, from the Hosting.de admin panel.
     required: true
   gh-token:
-    description: The API authentication token, from the Hosting.de admin panel.
+    description: Needed when the repository shall be checked out at remote.
+    default: ''
   app:
     description:
       You can only deploy one app on a time, provide the key of the current application defined in the config file.
@@ -24,9 +25,9 @@ inputs:
     required: true
   dotenv:
     description: A .env file contents to write on the remote host.
-  dotenv-name:
+  dotenv-file:
     description: Name of the `.env` file.
-    default: '.env.local'
+    default: '.env'
     required: true
   build:
     description: Shell script for building environment before deployment
@@ -116,9 +117,9 @@ runs:
         HOSTING_ENV=$(echo '${{ steps.hosting.outputs.env-vars }}' | jq -r 'to_entries[] | "\(.key)=\(.value)"')
         HOSTING_ENV=$HOSTING_ENV"\n"$USER_DOTENV
 
-        ssh -l "${{ steps.hosting.outputs.ssh-user }}" -p "${{ steps.hosting.outputs.ssh-port }}" "${{ steps.hosting.outputs.ssh-host }}" -o StrictHostKeyChecking=no "mkdir -p ${{ steps.hosting.outputs.deploy-path }}/shared && touch ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-name }}"
-        echo -e "$HOSTING_ENV" | ssh -l "${{ steps.hosting.outputs.ssh-user }}" -p "${{ steps.hosting.outputs.ssh-port }}" "${{ steps.hosting.outputs.ssh-host }}" -o StrictHostKeyChecking=no -T "cat >> ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-name }}"
-        ssh -l "${{ steps.hosting.outputs.ssh-user }}" -p "${{ steps.hosting.outputs.ssh-port }}" "${{ steps.hosting.outputs.ssh-host }}" -o StrictHostKeyChecking=no "tac ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-name }} | awk -F '=' '!seen["'$1'"]++' | tac > ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-name }}.tmp && mv ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-name }}.tmp ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-name }}"
+        ssh -l "${{ steps.hosting.outputs.ssh-user }}" -p "${{ steps.hosting.outputs.ssh-port }}" "${{ steps.hosting.outputs.ssh-host }}" -o StrictHostKeyChecking=no "mkdir -p ${{ steps.hosting.outputs.deploy-path }}/shared && touch ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-file }}"
+        echo -e "$HOSTING_ENV" | ssh -l "${{ steps.hosting.outputs.ssh-user }}" -p "${{ steps.hosting.outputs.ssh-port }}" "${{ steps.hosting.outputs.ssh-host }}" -o StrictHostKeyChecking=no -T "cat >> ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-file }}"
+        ssh -l "${{ steps.hosting.outputs.ssh-user }}" -p "${{ steps.hosting.outputs.ssh-port }}" "${{ steps.hosting.outputs.ssh-host }}" -o StrictHostKeyChecking=no "tac ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-file }} | awk -F '=' '!seen["'$1'"]++' | tac > ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-file }}.tmp && mv ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-file }}.tmp ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-file }}"
 
     # Make sure PHP is available
     - name: Setup PHP
@@ -136,6 +137,7 @@ runs:
 
     # Run build hook
     - name: Run build hook
+      if: ${{ inputs.build }}
       shell: bash
       run: ${{ inputs.build }}
 
