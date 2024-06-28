@@ -2,7 +2,7 @@ name: Read config
 description: ''
 
 outputs:
-  app-names:
+  apps:
     description: The keys configured under "applications.[]".
     value: ${{ steps.apps.outputs.result }}
 
