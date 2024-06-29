@@ -35,6 +35,8 @@ export async function getWebspace(
 
   const redisRelationName = Object.keys(app.relationships).find(key => 'redis' === app.relationships[key]) ?? null
   if (null !== redisRelationName) {
+    envVars[`${redisRelationName.replace('-', '_').toUpperCase()}_HOST`] =
+      `/run/redis-${webspace.webspaceName}/sock`
     envVars[`${redisRelationName.replace('-', '_').toUpperCase()}_URL`] =
       `redis:///run/redis-${webspace.webspaceName}/sock`
   }
