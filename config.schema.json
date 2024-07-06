@@ -296,28 +296,6 @@
             },
             "minItems": 1
           },
-          "workers": {
-            "type": "object",
-            "minProperties": 1,
-            "propertyNames": {
-              "pattern": "^[a-z][a-z0-9]*$"
-            },
-            "additionalProperties": {
-              "type": "object",
-              "properties": {
-                "commands": {
-                  "type": "object",
-                  "properties": {
-                    "start": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
-                }
-              },
-              "additionalProperties": false
-            }
-          },
           "users": {
             "type": "object",
             "additionalProperties": {
