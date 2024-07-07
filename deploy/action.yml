@@ -27,8 +27,8 @@ inputs:
     description: A .env file contents to write on the remote host.
   dotenv-file:
     description: Name of the `.env` file.
-    default: '.env'
-    required: true
+    default: ''
+    required: false
   build:
     description: Shell script for building environment before deployment
   with-node:
@@ -110,6 +110,7 @@ runs:
 
     # Write both user-provided and environment-provided environment variables to the remote host
     - name: Put environment variables
+      if: ${{ inputs.dotenv-file }}
       shell: bash
       env:
         USER_DOTENV: ${{ inputs.dotenv }}
