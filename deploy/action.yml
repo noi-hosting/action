@@ -153,3 +153,4 @@ runs:
           forward_agent=false -o repository=https://x-access-token:${{ inputs.gh-token }}@github.com/${{
           github.repository }}.git
         private-key: ${{ inputs.ssh-private-key }}
+        deployer-version: "7.4.0"
