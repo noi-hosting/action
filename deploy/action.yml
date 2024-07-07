@@ -70,7 +70,7 @@ runs:
     # Create all the web-spaces, vhosts and databases via the Hosting.de API
     - name: Setup Hosting.de environment
       id: hosting
-      uses: richardhj/setup-hostingde/setup@main
+      uses: noi-hosting/action/setup@dev
       with:
         auth-token: ${{ inputs.auth-token }}
         app: ${{ inputs.app }}
@@ -80,7 +80,7 @@ runs:
     # Sync app
     - name: Sync environments
       if: ${{ steps.hosting.outputs.sync-files || steps.hosting.outputs.sync-databases }}
-      uses: richardhj/setup-hostingde/sync@main
+      uses: noi-hosting/action/sync@dev
       with:
         auth-token: ${{ inputs.auth-token }}
         project-prefix: ${{ inputs.project-prefix }}
