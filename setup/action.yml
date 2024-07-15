@@ -14,6 +14,7 @@ inputs:
     description:
       A prefix used to identify resources on Hosting.de. Must be kept unique under all projects under the account. Keep
       it short, e.g. `project1`
+    default: ''
     required: true
   ssh-public-key:
     description: The SSH public key that matches the private key configured for deploying.

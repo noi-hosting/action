@@ -17,7 +17,8 @@ import {
 
 export async function getWebspace(
   webspaceName: string,
-  app: AppConfig
+  app: AppConfig,
+  pool: string | null
 ): Promise<{
   webspace: WebspaceResult
   isNew: boolean
@@ -28,15 +29,14 @@ export async function getWebspace(
     [key: string]: string | boolean | number
   }
 }> {
-  const { webspace, webspaceAccess, isNew } = await findOrCreateWebspace(webspaceName, app)
+  const { webspace, webspaceAccess, isNew } = await findOrCreateWebspace(webspaceName, app, pool)
   const envVars: {
     [key: string]: string | boolean | number
   } = {}
 
   const redisRelationName = Object.keys(app.relationships).find(key => 'redis' === app.relationships[key]) ?? null
   if (null !== redisRelationName) {
-    envVars[`${redisRelationName.replace('-', '_').toUpperCase()}_HOST`] =
-      `/run/redis-${webspace.webspaceName}/sock`
+    envVars[`${redisRelationName.replace('-', '_').toUpperCase()}_HOST`] = `/run/redis-${webspace.webspaceName}/sock`
     envVars[`${redisRelationName.replace('-', '_').toUpperCase()}_URL`] =
       `redis:///run/redis-${webspace.webspaceName}/sock`
   }
@@ -112,7 +112,8 @@ export async function applyDatabases(
 
 export async function findOrCreateWebspace(
   webspaceName: string,
-  app: AppConfig
+  app: AppConfig,
+  pool: string | null
 ): Promise<{
   webspace: WebspaceResult
   webspaceAccess: WebspaceAccess
@@ -202,7 +203,7 @@ export async function findOrCreateWebspace(
     users,
     app.cron,
     app.php.version,
-    app.pool,
+    pool,
     app.account,
     redisEnabled
   )
@@ -348,7 +349,7 @@ export async function configureDatabases(
         database: createdDatabase,
         databaseUserName,
         databasePassword
-      } = await client.createDatabase(dbUserName, databaseInternalName, app.pool ?? null)
+      } = await client.createDatabase(dbUserName, databaseInternalName, config.project.pool)
 
       let database: DatabaseResult | null = createdDatabase
       do {

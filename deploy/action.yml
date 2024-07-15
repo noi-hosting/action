@@ -16,7 +16,8 @@ inputs:
     description:
       A prefix used to identify resources on Hosting.de. Must be kept unique under all projects under the account. Keep
       it short, e.g. `project1`
-    required: true
+    default: ''
+    required: false
   ssh-public-key:
     description: The SSH public key for deploying.
     required: true
@@ -153,4 +154,4 @@ runs:
           forward_agent=false -o repository=https://x-access-token:${{ inputs.gh-token }}@github.com/${{
           github.repository }}.git
         private-key: ${{ inputs.ssh-private-key }}
-        deployer-version: "7.4.0"
+        deployer-version: '7.4.0'

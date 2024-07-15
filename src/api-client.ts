@@ -368,7 +368,7 @@ export async function createVhost(
           return {
             matchString,
             matchType: matchString.startsWith('^') ? 'regex' : matchString.startsWith('/') ? 'directory' : 'default',
-            locationType: location.allow ?? true ? 'generic' : 'blockAccess',
+            locationType: (location.allow ?? true) ? 'generic' : 'blockAccess',
             mapScript: typeof (location.passthru ?? false) === 'string' ? location.passthru : '',
             phpEnabled: false !== (location.passthru ?? false)
           }
@@ -706,6 +706,8 @@ interface WebspaceResult {
   productCode: string
   hostName: string
   poolId: string
+  serverIpv4?: string
+  serverIpv6?: string
   cronJobs: CronJob[]
   storageQuota: number
   redisEnabled: boolean

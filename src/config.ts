@@ -11,6 +11,7 @@ export async function readConfig(appKey: string): Promise<{
   const config = Object.assign(
     {
       project: {
+        pool: null,
         prune: true
       }
     },
@@ -21,7 +22,6 @@ export async function readConfig(appKey: string): Promise<{
   if (appKey in config.applications) {
     app = Object.assign(
       {
-        pool: null,
         account: null,
         php: {
           ini: {},
@@ -54,6 +54,7 @@ interface Config {
     parent: string
     domain?: string
     prune: boolean
+    pool: string | null
   }
   applications: {
     [app: string]: AppConfig
@@ -67,7 +68,6 @@ interface Config {
 }
 
 interface AppConfig {
-  pool: string | null
   account: string | null
   php: {
     version: string
