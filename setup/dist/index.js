@@ -50555,16 +50555,17 @@ exports.deleteRestorableVhostById = deleteRestorableVhostById;
 exports.deleteDatabaseById = deleteDatabaseById;
 exports.truncateDatabaseById = truncateDatabaseById;
 exports.deleteDatabaseUserById = deleteDatabaseUserById;
+exports.deleteWebspaceUserById = deleteWebspaceUserById;
 exports.findDatabases = findDatabases;
 exports.findDatabaseById = findDatabaseById;
 exports.findDatabaseAccesses = findDatabaseAccesses;
 exports.findUsersByName = findUsersByName;
+exports.findDatabaseUsersByName = findDatabaseUsersByName;
 exports.createWebspace = createWebspace;
 exports.updateWebspace = updateWebspace;
 exports.updateDatabase = updateDatabase;
 exports.createVhost = createVhost;
 exports.createDatabase = createDatabase;
-exports.getAccesses = getAccesses;
 exports.addDatabaseAccess = addDatabaseAccess;
 exports.createWebspaceUser = createWebspaceUser;
 exports.createDatabaseUser = createDatabaseUser;
@@ -50685,6 +50686,12 @@ async function deleteDatabaseUserById(userId) {
         userId
     });
 }
+async function deleteWebspaceUserById(userId) {
+    await _http.postJson(`${baseUri}/webhosting/v1/json/userDelete`, {
+        authToken: token,
+        userId
+    });
+}
 async function findDatabases(databaseNames) {
     if (typeof databaseNames === 'string') {
         databaseNames = [databaseNames];
@@ -50740,6 +50747,10 @@ async function findDatabaseAccesses(userName, databaseId) {
                     value: databaseId
                 }
             ]
+        },
+        sort: {
+            field: 'UserAddDate',
+            order: 'DESC'
         }
     });
     return response.result?.response?.data ?? [];
@@ -50749,6 +50760,22 @@ async function findUsersByName(name) {
         name = [name];
     }
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/usersFind`, {
+        authToken: token,
+        filter: {
+            subFilterConnective: 'OR',
+            subFilter: name.map(q => ({
+                field: 'userName',
+                value: q
+            }))
+        }
+    });
+    return response.result?.response?.data ?? [];
+}
+async function findDatabaseUsersByName(name) {
+    if (typeof name === 'string') {
+        name = [name];
+    }
+    const response = await _http.postJson(`${baseUri}/database/v1/json/usersFind`, {
         authToken: token,
         filter: {
             subFilterConnective: 'OR',
@@ -51485,30 +51512,27 @@ async function configureDatabases(config, app, databasePrefix, appKey, foundData
         if (!(config.databases?.schemas ?? []).includes(schema)) {
             throw new Error(`Could not find schema "${schema}" under "databases.schemas"`);
         }
-        const databaseInternalName = `${databasePrefix}-${schema.toLowerCase()}`;
-        const dbUserName = `${databasePrefix}-${endpointName.toLowerCase()}--${appKey}`;
+        const databaseInternalName = `${databasePrefix}-${schema}`;
+        const dbUserName = `${databasePrefix}-${endpointName}--${appKey}`;
         core.info(`Processing database "${schema}" for relation "${relationName}"`);
         const existingDatabase = foundDatabases.find(d => d.name === databaseInternalName) ?? null;
         if (null !== existingDatabase) {
-            const usersWithAccess = await client.findDatabaseAccesses(dbUserName, existingDatabase.id);
+            const usersWithAccess = await client.findDatabaseAccesses(`${dbUserName}.*`, existingDatabase.id);
+            // Get current rotation
+            let rotation = 0;
             if (usersWithAccess.length) {
-                core.info(`Database already in use (${databaseInternalName})`);
-                const access = existingDatabase.accesses.find(a => a.userId === usersWithAccess[0].id);
-                if ((privileges ?? 'admin') !== getPrivileges(access?.accessLevel ?? [])) {
-                    await client.updateDatabase(existingDatabase, existingDatabase.accesses.map(a => {
-                        if (a.userId === usersWithAccess[0].id) {
-                            a.accessLevel = (0, api_client_1.getAccesses)(privileges ?? 'admin');
-                        }
-                        return a;
-                    }));
-                }
+                const matchName = usersWithAccess[0].name.match(/\.v(\d+)$/);
+                rotation = null === matchName ? 0 : (+matchName[1] ?? 0);
             }
-            else {
-                core.info(`Granting access on database ${databaseInternalName}`);
-                const { user: dbUser, password: databasePassword } = await client.createDatabaseUser(dbUserName, app.account);
-                const { database, dbLogin } = await client.addDatabaseAccess(existingDatabase, dbUser, privileges ?? '');
-                defineEnv(envVars, relationName, database, dbLogin, databasePassword);
+            core.info(`Rotating access on database ${databaseInternalName}`);
+            // Create rotated db user
+            const { user: dbUser, password: databasePassword } = await client.createDatabaseUser(`${dbUserName}.v${++rotation}`, app.account);
+            const { database, dbLogin } = await client.addDatabaseAccess(existingDatabase, dbUser, privileges ?? '');
+            // Delete old db users
+            for (const u of usersWithAccess.slice(1)) {
+                await client.deleteDatabaseUserById(u.id);
             }
+            defineEnv(envVars, relationName, database, dbLogin, databasePassword);
         }
         else {
             core.info(`Creating database ${databaseInternalName}`);
@@ -51573,6 +51597,16 @@ async function pruneBranches(projectPrefix) {
                 core.info(`Deleting database ${d.name}`);
                 await client.deleteDatabaseById(d.id);
             }
+            const dbUsers = await client.findDatabaseUsersByName(`${projectPrefix}-${match[1]}-*`.trim());
+            for (const u of dbUsers) {
+                core.info(`Deleting database user ${u.name}`);
+                await client.deleteDatabaseUserById(u.id);
+            }
+            const users = await client.findUsersByName(`github-action--${projectPrefix}-${match[1]}`.trim());
+            for (const u of users) {
+                core.info(`Deleting webspace user ${u.userName}`);
+                await client.deleteWebspaceUserById(u.id);
+            }
         }
     }
 }
@@ -51595,18 +51629,6 @@ function translateDomainName(domainName, environment, config, app) {
         .replace(/\{default}/gi, defaultDomainName)
         .replace(/\{app}/gi, app)
         .replace(/\{ref}/gi, environment);
-}
-function getPrivileges(accessLevel) {
-    if (accessLevel.includes('read') && accessLevel.includes('write') && accessLevel.includes('schema')) {
-        return 'admin';
-    }
-    if (accessLevel.includes('read') && accessLevel.includes('write')) {
-        return 'rw';
-    }
-    if (accessLevel.includes('read')) {
-        return 'r';
-    }
-    throw new Error(`Access level "${JSON.stringify(accessLevel)}" unknown.`);
 }
 function mustBeUpdated(vhost, app, web) {
     if (app.php.version !== vhost.phpVersion) {

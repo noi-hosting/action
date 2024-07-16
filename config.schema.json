@@ -84,7 +84,7 @@
             },
             "additionalProperties": {
               "type": "string",
-              "pattern": "^\\w+(:\\w+)?$"
+              "pattern": "^[a-z0-9]+(:[a-z0-9]+)?$"
             }
           },
           "sync": {
@@ -269,7 +269,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "pattern": "^\\w+$"
+            "pattern": "^[a-z0-9]+$"
           },
           "minItems": 1,
           "uniqueItems": true,
@@ -283,7 +283,7 @@
           },
           "additionalProperties": {
             "type": "string",
-            "pattern": "^\\w+(:(admin|ro|rw))?$",
+            "pattern": "^[a-z0-9]+(:(admin|ro|rw))?$",
             "description": "Use <SCHEMA>:<ACCESS_LEVEL> notation here, which means, that the given endpoint can access <SCHEMA> with <ACCESS_LEVEL> permissions."
           }
         }

@@ -34569,16 +34569,17 @@ exports.deleteRestorableVhostById = deleteRestorableVhostById;
 exports.deleteDatabaseById = deleteDatabaseById;
 exports.truncateDatabaseById = truncateDatabaseById;
 exports.deleteDatabaseUserById = deleteDatabaseUserById;
+exports.deleteWebspaceUserById = deleteWebspaceUserById;
 exports.findDatabases = findDatabases;
 exports.findDatabaseById = findDatabaseById;
 exports.findDatabaseAccesses = findDatabaseAccesses;
 exports.findUsersByName = findUsersByName;
+exports.findDatabaseUsersByName = findDatabaseUsersByName;
 exports.createWebspace = createWebspace;
 exports.updateWebspace = updateWebspace;
 exports.updateDatabase = updateDatabase;
 exports.createVhost = createVhost;
 exports.createDatabase = createDatabase;
-exports.getAccesses = getAccesses;
 exports.addDatabaseAccess = addDatabaseAccess;
 exports.createWebspaceUser = createWebspaceUser;
 exports.createDatabaseUser = createDatabaseUser;
@@ -34699,6 +34700,12 @@ async function deleteDatabaseUserById(userId) {
         userId
     });
 }
+async function deleteWebspaceUserById(userId) {
+    await _http.postJson(`${baseUri}/webhosting/v1/json/userDelete`, {
+        authToken: token,
+        userId
+    });
+}
 async function findDatabases(databaseNames) {
     if (typeof databaseNames === 'string') {
         databaseNames = [databaseNames];
@@ -34754,6 +34761,10 @@ async function findDatabaseAccesses(userName, databaseId) {
                     value: databaseId
                 }
             ]
+        },
+        sort: {
+            field: 'UserAddDate',
+            order: 'DESC'
         }
     });
     return response.result?.response?.data ?? [];
@@ -34763,6 +34774,22 @@ async function findUsersByName(name) {
         name = [name];
     }
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/usersFind`, {
+        authToken: token,
+        filter: {
+            subFilterConnective: 'OR',
+            subFilter: name.map(q => ({
+                field: 'userName',
+                value: q
+            }))
+        }
+    });
+    return response.result?.response?.data ?? [];
+}
+async function findDatabaseUsersByName(name) {
+    if (typeof name === 'string') {
+        name = [name];
+    }
+    const response = await _http.postJson(`${baseUri}/database/v1/json/usersFind`, {
         authToken: token,
         filter: {
             subFilterConnective: 'OR',

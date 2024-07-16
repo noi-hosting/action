@@ -144,6 +144,13 @@ export async function deleteDatabaseUserById(userId: string): Promise<void> {
   })
 }
 
+export async function deleteWebspaceUserById(userId: string): Promise<void> {
+  await _http.postJson(`${baseUri}/webhosting/v1/json/userDelete`, {
+    authToken: token,
+    userId
+  })
+}
+
 export async function findDatabases(databaseNames: string | string[]): Promise<DatabaseResult[]> {
   if (typeof databaseNames === 'string') {
     databaseNames = [databaseNames]
@@ -213,6 +220,10 @@ export async function findDatabaseAccesses(userName: string, databaseId: string)
             value: databaseId
           }
         ]
+      },
+      sort: {
+        field: 'UserAddDate',
+        order: 'DESC'
       }
     }
   )
@@ -227,6 +238,28 @@ export async function findUsersByName(name: string | string[]): Promise<Webspace
 
   const response: TypedResponse<ApiFindResponse<WebspaceUserResult>> = await _http.postJson(
     `${baseUri}/webhosting/v1/json/usersFind`,
+    {
+      authToken: token,
+      filter: {
+        subFilterConnective: 'OR',
+        subFilter: name.map(q => ({
+          field: 'userName',
+          value: q
+        }))
+      }
+    }
+  )
+
+  return response.result?.response?.data ?? []
+}
+
+export async function findDatabaseUsersByName(name: string | string[]): Promise<DatabaseUserResult[]> {
+  if (typeof name === 'string') {
+    name = [name]
+  }
+
+  const response: TypedResponse<ApiFindResponse<DatabaseUserResult>> = await _http.postJson(
+    `${baseUri}/database/v1/json/usersFind`,
     {
       authToken: token,
       filter: {
@@ -453,7 +486,7 @@ export async function createDatabase(
   }
 }
 
-export function getAccesses(privilege: string): string[] {
+function getAccesses(privilege: string): string[] {
   let accessLevel
   switch (privilege) {
     case 'ro':

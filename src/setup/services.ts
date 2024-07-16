@@ -11,8 +11,7 @@ import {
   VhostResult,
   WebspaceAccess,
   WebspaceResult,
-  UserResult,
-  getAccesses
+  UserResult
 } from '../api-client'
 
 export async function getWebspace(
@@ -329,37 +328,38 @@ export async function configureDatabases(
       throw new Error(`Could not find schema "${schema}" under "databases.schemas"`)
     }
 
-    const databaseInternalName = `${databasePrefix}-${schema.toLowerCase()}`
-    const dbUserName = `${databasePrefix}-${endpointName.toLowerCase()}--${appKey}`
+    const databaseInternalName = `${databasePrefix}-${schema}`
+    const dbUserName = `${databasePrefix}-${endpointName}--${appKey}`
 
     core.info(`Processing database "${schema}" for relation "${relationName}"`)
 
     const existingDatabase = foundDatabases.find(d => d.name === databaseInternalName) ?? null
     if (null !== existingDatabase) {
-      const usersWithAccess = await client.findDatabaseAccesses(dbUserName, existingDatabase.id)
+      const usersWithAccess = await client.findDatabaseAccesses(`${dbUserName}.*`, existingDatabase.id)
+
+      // Get current rotation
+      let rotation = 0
       if (usersWithAccess.length) {
-        core.info(`Database already in use (${databaseInternalName})`)
-
-        const access = existingDatabase.accesses.find(a => a.userId === usersWithAccess[0].id)
-        if ((privileges ?? 'admin') !== getPrivileges(access?.accessLevel ?? [])) {
-          await client.updateDatabase(
-            existingDatabase,
-            existingDatabase.accesses.map(a => {
-              if (a.userId === usersWithAccess[0].id) {
-                a.accessLevel = getAccesses(privileges ?? 'admin')
-              }
-              return a
-            })
-          )
-        }
-      } else {
-        core.info(`Granting access on database ${databaseInternalName}`)
-
-        const { user: dbUser, password: databasePassword } = await client.createDatabaseUser(dbUserName, app.account)
-        const { database, dbLogin } = await client.addDatabaseAccess(existingDatabase, dbUser, privileges ?? '')
-
-        defineEnv(envVars, relationName, database, dbLogin, databasePassword)
+        const matchName = usersWithAccess[0].name.match(/\.v(\d+)$/)
+        rotation = null === matchName ? 0 : (+matchName[1] ?? 0)
       }
+
+      core.info(`Rotating access on database ${databaseInternalName}`)
+
+      // Create rotated db user
+      const { user: dbUser, password: databasePassword } = await client.createDatabaseUser(
+        `${dbUserName}.v${++rotation}`,
+        app.account
+      )
+
+      const { database, dbLogin } = await client.addDatabaseAccess(existingDatabase, dbUser, privileges ?? '')
+
+      // Delete old db users
+      for (const u of usersWithAccess.slice(1)) {
+        await client.deleteDatabaseUserById(u.id)
+      }
+
+      defineEnv(envVars, relationName, database, dbLogin, databasePassword)
     } else {
       core.info(`Creating database ${databaseInternalName}`)
 
@@ -455,6 +455,18 @@ export async function pruneBranches(projectPrefix: string): Promise<void> {
         core.info(`Deleting database ${d.name}`)
         await client.deleteDatabaseById(d.id)
       }
+
+      const dbUsers = await client.findDatabaseUsersByName(`${projectPrefix}-${match[1]}-*`.trim())
+      for (const u of dbUsers) {
+        core.info(`Deleting database user ${u.name}`)
+        await client.deleteDatabaseUserById(u.id)
+      }
+
+      const users = await client.findUsersByName(`github-action--${projectPrefix}-${match[1]}`.trim())
+      for (const u of users) {
+        core.info(`Deleting webspace user ${u.userName}`)
+        await client.deleteWebspaceUserById(u.id)
+      }
     }
   }
 }
@@ -482,20 +494,6 @@ function translateDomainName(domainName: string, environment: string, config: Co
     .replace(/\{default}/gi, defaultDomainName)
     .replace(/\{app}/gi, app)
     .replace(/\{ref}/gi, environment)
-}
-
-function getPrivileges(accessLevel: string[]): string {
-  if (accessLevel.includes('read') && accessLevel.includes('write') && accessLevel.includes('schema')) {
-    return 'admin'
-  }
-  if (accessLevel.includes('read') && accessLevel.includes('write')) {
-    return 'rw'
-  }
-  if (accessLevel.includes('read')) {
-    return 'r'
-  }
-
-  throw new Error(`Access level "${JSON.stringify(accessLevel)}" unknown.`)
 }
 
 function mustBeUpdated(vhost: VhostResult, app: AppConfig, web: WebConfig): boolean {
