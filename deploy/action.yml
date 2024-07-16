@@ -157,17 +157,10 @@ runs:
         private-key: ${{ inputs.ssh-private-key }}
         deployer-version: '7.4.0'
 
-    - name: Unlock deployment (Prepare 1/2)
+    - name: Unlock deployment (Prepare)
       if: ${{ failure() && steps.deployer.conclusion == 'failure' }}
       shell: bash
       run: killall ssh-agent
-
-    - name: Unlock deployment (Prepare 2/2)
-      if: ${{ failure() && steps.deployer.conclusion == 'failure' }}
-      uses: shimataro/ssh-key-action@v2
-      with:
-        key: ${{ inputs.ssh-private-key }}
-        known_hosts: unnecessary
 
     - name: Unlock deployment
       if: ${{ failure() && steps.deployer.conclusion == 'failure' }}
