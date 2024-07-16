@@ -135,7 +135,7 @@ export async function findOrCreateWebspace(
       continue
     }
 
-    const requiredAccessRole = core.getInput('access-role-ssh')
+    const requiredAccessRole = core.getInput('access-role-ssh') ?? 'contributor'
     if (!['admin', 'contributor'].includes(requiredAccessRole)) {
       console.error(`Access role "${requiredAccessRole} is not supported`)
       continue
@@ -471,6 +471,7 @@ export async function pruneBranches(projectPrefix: string): Promise<void> {
 
 function translateDomainName(domainName: string, environment: string, config: Config, app: string): string {
   let defaultDomainName = core.getInput('default-domain-name')
+  core.info(`default-domain-name: ${defaultDomainName}`)
   const previewDomain = config.project.domain ?? null
   if ('' === defaultDomainName && null !== previewDomain) {
     defaultDomainName = previewDomain
@@ -479,7 +480,7 @@ function translateDomainName(domainName: string, environment: string, config: Co
   if ('' === defaultDomainName) {
     throw new Error(
       `No domain name configured for the app defined under "applications.${app}". ` +
-        `Please provide the a variable named "DOMAIN_NAME" under Github's environment settings. ` +
+        `Please set the "default-domain-name" input (via environment variables). ` +
         `Alternatively, set the domain name via "applications.${app}.web.locations[].domainName".`
     )
   }
