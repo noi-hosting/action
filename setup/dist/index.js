@@ -51175,7 +51175,7 @@ async function run() {
         const ref = process.env.GITHUB_REF_NAME ?? 'na';
         const appKey = core.getInput('app', { required: true });
         const uniqStr = `${github.context.repo.owner}/${github.context.repo.repo}-${github.context.workflow}`;
-        const uniqHandle = crypto_1.default.createHash('sha512').update(uniqStr).digest('hex').substring(0, 7);
+        const uniqHandle = crypto_1.default.createHash('sha1').update(uniqStr).digest('hex').substring(0, 5);
         let projectPrefix = core.getInput('project-prefix');
         if ('' === projectPrefix) {
             projectPrefix = uniqHandle;

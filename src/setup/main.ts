@@ -20,7 +20,7 @@ export async function run(): Promise<void> {
     const appKey: string = core.getInput('app', { required: true })
 
     const uniqStr = `${github.context.repo.owner}/${github.context.repo.repo}-${github.context.workflow}`
-    const uniqHandle = crypto.createHash('sha512').update(uniqStr).digest('hex').substring(0, 7)
+    const uniqHandle = crypto.createHash('sha1').update(uniqStr).digest('hex').substring(0, 5)
 
     let projectPrefix: string = core.getInput('project-prefix')
     if ('' === projectPrefix) {

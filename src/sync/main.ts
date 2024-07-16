@@ -1,6 +1,7 @@
 // noinspection ExceptionCaughtLocallyJS
 
 import * as core from '@actions/core'
+import * as github from '@actions/github'
 import { exec } from '@actions/exec'
 import * as client from '../api-client'
 import { readConfig } from '../config'
@@ -16,9 +17,14 @@ export async function run(): Promise<void> {
     const appKey: string = core.getInput('app', {
       required: false
     })
-    const projectPrefix: string = core.getInput('project-prefix', {
-      required: true
-    })
+    const uniqStr = `${github.context.repo.owner}/${github.context.repo.repo}-${github.context.workflow}`
+    const uniqHandle = crypto.createHash('sha1').update(uniqStr).digest('hex').substring(0, 5)
+
+    let projectPrefix: string = core.getInput('project-prefix')
+    if ('' === projectPrefix) {
+      projectPrefix = uniqHandle
+    }
+
     const shallSyncFiles: boolean = 'false' !== core.getInput('files')
     const shallSyncDatabases: boolean = 'false' !== core.getInput('databases')
     const syncDatabases: string[] = core.getInput('only-databases').split(' ')
