@@ -91,6 +91,9 @@ export async function run(): Promise<void> {
     )
     const { newDatabases, envVars: env3 } = await services.applyDatabases(databasePrefix, appKey, app, config)
 
+    // Should become overridden as soon it is configured in the workflow file under `with.dotenv`
+    const env0 = { MAILER_DSN: 'native://default' }
+
     core.setOutput('sync-files', isNewWebspace)
     core.setOutput('sync-databases', newDatabases.join(' '))
     core.setOutput('ssh-user', sshUser)
@@ -99,7 +102,7 @@ export async function run(): Promise<void> {
     core.setOutput('http-user', httpUser)
     core.setOutput('php-version', phpVersion)
     core.setOutput('php-extensions', phpExtensions.join(', '))
-    core.setOutput('env-vars', Object.assign(env1, env2, env3))
+    core.setOutput('env-vars', Object.assign(env0, env1, env2, env3))
     core.setOutput('deploy-path', destinations[0].deployPath)
     core.setOutput('public-url', destinations[0].publicUrl)
 
