@@ -67,8 +67,9 @@ runs:
         script: |
           return await github.rest.repos.listBranches({
             owner: context.repo.owner,
-            repo: context.repo.repo
-          }).then(branches => branches.map(b => b.name).join())
+            repo: context.repo.repo,
+            per_page: 100
+          }).then(({branches}) => branches.map(b => b.name).join())
 
     # Create all the web-spaces, vhosts and databases via the Hosting.de API
     - name: Setup Hosting.de environment
