@@ -143,7 +143,7 @@ export async function findOrCreateWebspace(
       continue
     }
 
-    if (requiredAccessRole === 'admin' && (user.role ?? 'collaborator') !== 'admin') {
+    if (requiredAccessRole === 'admin' && (user.role ?? 'contributor') !== 'admin') {
       continue
     }
 

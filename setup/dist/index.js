@@ -51363,7 +51363,7 @@ async function findOrCreateWebspace(webspaceName, app, users, pool) {
             console.error(`Access role "${requiredAccessRole} is not supported`);
             continue;
         }
-        if (requiredAccessRole === 'admin' && (user.role ?? 'collaborator') !== 'admin') {
+        if (requiredAccessRole === 'admin' && (user.role ?? 'contributor') !== 'admin') {
             continue;
         }
         const fingerprint = crypto_1.default.createHash('sha1').update(user.key).digest('hex');

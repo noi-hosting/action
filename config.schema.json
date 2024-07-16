@@ -305,8 +305,8 @@
           },
           "role": {
             "type": "string",
-            "enum": ["admin", "collaborator"],
-            "default": "collaborator"
+            "enum": ["admin", "contributor"],
+            "default": "contributor"
           }
         }
       }
