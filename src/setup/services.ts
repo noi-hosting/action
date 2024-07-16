@@ -138,7 +138,7 @@ export async function findOrCreateWebspace(
     }
 
     const requiredAccessRole = process.env.ACCESS_ROLE_SSH ?? 'contributor'
-    if (!['admin', 'collaborator'].includes(requiredAccessRole)) {
+    if (!['admin', 'contributor'].includes(requiredAccessRole)) {
       console.error(`Access role "${requiredAccessRole} is not supported`)
       continue
     }

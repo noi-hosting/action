@@ -51359,7 +51359,7 @@ async function findOrCreateWebspace(webspaceName, app, users, pool) {
             continue;
         }
         const requiredAccessRole = node_process_1.default.env.ACCESS_ROLE_SSH ?? 'contributor';
-        if (!['admin', 'collaborator'].includes(requiredAccessRole)) {
+        if (!['admin', 'contributor'].includes(requiredAccessRole)) {
             console.error(`Access role "${requiredAccessRole} is not supported`);
             continue;
         }
