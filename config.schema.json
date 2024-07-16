@@ -107,7 +107,7 @@
                 "domainName": {
                   "type": "string",
                   "default": "{default}",
-                  "pattern": "^([a-z0-9.\\-]|{default}|{app}|{ref})+$"
+                  "pattern": "^([a-z0-9.\\-]|\\{default\\}|\\{app\\}|\\{ref\\})+$"
                 },
                 "www": {
                   "type": "boolean",
