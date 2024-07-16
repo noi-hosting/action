@@ -1,4 +1,5 @@
 import * as yaml from 'js-yaml'
+import * as _ from 'lodash'
 import fs from 'fs'
 
 export async function readConfig(appKey: string): Promise<{
@@ -9,7 +10,7 @@ export async function readConfig(appKey: string): Promise<{
     [key: string]: string | boolean | number
   }
 }> {
-  const config = Object.assign(
+  const config = _.merge(
     {
       project: {
         pool: null,
@@ -22,7 +23,7 @@ export async function readConfig(appKey: string): Promise<{
 
   let app = null
   if (appKey in config.applications) {
-    app = Object.assign(
+    app = _.merge(
       {
         account: null,
         php: {

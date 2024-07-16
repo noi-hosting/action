@@ -51118,9 +51118,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.readConfig = readConfig;
 const yaml = __importStar(__nccwpck_require__(6365));
+const _ = __importStar(__nccwpck_require__(7337));
 const fs_1 = __importDefault(__nccwpck_require__(7147));
 async function readConfig(appKey) {
-    const config = Object.assign({
+    const config = _.merge({
         project: {
             pool: null,
             prune: true
@@ -51129,7 +51130,7 @@ async function readConfig(appKey) {
     }, yaml.load(fs_1.default.readFileSync('./.hosting/config.yaml', 'utf8')));
     let app = null;
     if (appKey in config.applications) {
-        app = Object.assign({
+        app = _.merge({
             account: null,
             php: {
                 ini: {},
@@ -51269,7 +51270,6 @@ async function run() {
         core.setOutput('env-vars', Object.assign(env1, env2, env3));
         core.setOutput('deploy-path', destinations[0].deployPath);
         core.setOutput('public-url', destinations[0].publicUrl);
-        core.info(`Prune: ${JSON.stringify(config.project)}`);
         if (config.project.prune) {
             await services.pruneBranches(projectPrefix);
         }
