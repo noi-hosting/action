@@ -471,7 +471,6 @@ export async function pruneBranches(projectPrefix: string): Promise<void> {
 
 function translateDomainName(domainName: string, environment: string, config: Config, app: string): string {
   let defaultDomainName = core.getInput('default-domain-name')
-  core.info(`default-domain-name: ${defaultDomainName}`)
   const previewDomain = config.project.domain ?? null
   if ('' === defaultDomainName && null !== previewDomain) {
     defaultDomainName = previewDomain

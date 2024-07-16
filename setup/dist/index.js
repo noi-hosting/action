@@ -51613,7 +51613,6 @@ async function pruneBranches(projectPrefix) {
 }
 function translateDomainName(domainName, environment, config, app) {
     let defaultDomainName = core.getInput('default-domain-name');
-    core.info(`default-domain-name: ${defaultDomainName}`);
     const previewDomain = config.project.domain ?? null;
     if ('' === defaultDomainName && null !== previewDomain) {
         defaultDomainName = previewDomain;
