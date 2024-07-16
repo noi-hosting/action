@@ -50551,6 +50551,7 @@ exports.findWebspaceById = findWebspaceById;
 exports.findVhostByWebspace = findVhostByWebspace;
 exports.deleteWebspaceById = deleteWebspaceById;
 exports.deleteVhostById = deleteVhostById;
+exports.deleteRestorableVhostById = deleteRestorableVhostById;
 exports.deleteDatabaseById = deleteDatabaseById;
 exports.truncateDatabaseById = truncateDatabaseById;
 exports.deleteDatabaseUserById = deleteDatabaseUserById;
@@ -50656,6 +50657,12 @@ async function deleteWebspaceById(webspaceId) {
 }
 async function deleteVhostById(vhostId) {
     await _http.postJson(`${baseUri}/webhosting/v1/json/vhostDelete`, {
+        authToken: token,
+        vhostId
+    });
+}
+async function deleteRestorableVhostById(vhostId) {
+    await _http.postJson(`${baseUri}/webhosting/v1/json/vhostPurgeRestorable`, {
         authToken: token,
         vhostId
     });
@@ -51459,11 +51466,11 @@ async function configureVhosts(web, app, ref, config, appKey, foundVhosts, websp
     };
 }
 async function pruneVhosts(foundVhosts, app, ref, config, appKey) {
-    for (const relict of foundVhosts.filter(v => !Object.keys(app.web)
-        .map(domainName => translateDomainName(domainName, ref, config, appKey))
-        .includes(v.domainName))) {
+    for (const relict of foundVhosts.filter(v => app.web.map(web => translateDomainName(web.domainName ?? '{default}', ref, config, appKey)).includes(v.domainName))) {
         core.info(`Deleting ${relict.domainName}...`);
         await client.deleteVhostById(relict.id);
+        await (0, wait_1.wait)(2000);
+        await client.deleteRestorableVhostById(relict.id);
     }
 }
 async function configureDatabases(config, app, databasePrefix, appKey, foundDatabases, envVars) {

@@ -294,15 +294,14 @@ export async function pruneVhosts(
   config: Config,
   appKey: string
 ): Promise<void> {
-  for (const relict of foundVhosts.filter(
-    v =>
-      !Object.keys(app.web)
-        .map(domainName => translateDomainName(domainName, ref, config, appKey))
-        .includes(v.domainName)
+  for (const relict of foundVhosts.filter(v =>
+    app.web.map(web => translateDomainName(web.domainName ?? '{default}', ref, config, appKey)).includes(v.domainName)
   )) {
     core.info(`Deleting ${relict.domainName}...`)
 
     await client.deleteVhostById(relict.id)
+    await wait(2000)
+    await client.deleteRestorableVhostById(relict.id)
   }
 }
 

@@ -116,6 +116,13 @@ export async function deleteVhostById(vhostId: string): Promise<void> {
   })
 }
 
+export async function deleteRestorableVhostById(vhostId: string): Promise<void> {
+  await _http.postJson(`${baseUri}/webhosting/v1/json/vhostPurgeRestorable`, {
+    authToken: token,
+    vhostId
+  })
+}
+
 export async function deleteDatabaseById(databaseId: string): Promise<void> {
   await _http.postJson(`${baseUri}/database/v1/json/databaseDelete`, {
     authToken: token,

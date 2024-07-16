@@ -34565,6 +34565,7 @@ exports.findWebspaceById = findWebspaceById;
 exports.findVhostByWebspace = findVhostByWebspace;
 exports.deleteWebspaceById = deleteWebspaceById;
 exports.deleteVhostById = deleteVhostById;
+exports.deleteRestorableVhostById = deleteRestorableVhostById;
 exports.deleteDatabaseById = deleteDatabaseById;
 exports.truncateDatabaseById = truncateDatabaseById;
 exports.deleteDatabaseUserById = deleteDatabaseUserById;
@@ -34670,6 +34671,12 @@ async function deleteWebspaceById(webspaceId) {
 }
 async function deleteVhostById(vhostId) {
     await _http.postJson(`${baseUri}/webhosting/v1/json/vhostDelete`, {
+        authToken: token,
+        vhostId
+    });
+}
+async function deleteRestorableVhostById(vhostId) {
+    await _http.postJson(`${baseUri}/webhosting/v1/json/vhostPurgeRestorable`, {
         authToken: token,
         vhostId
     });
