@@ -52273,14 +52273,14 @@ function transformCronJob(config, phpVersion) {
     if (config.php !== undefined && config.php !== null) {
         const [script, ...parameters] = config.php.split(' ');
         cronjob.type = 'php';
-        cronjob.script = `current/${script}`;
+        cronjob.script = `html/current/${script}`;
         cronjob.parameters = parameters;
         cronjob.interpreterVersion = phpVersion;
     }
     else if (config.cmd !== undefined && config.cmd !== null) {
         const [script, ...parameters] = config.cmd.split(' ');
         cronjob.type = 'bash';
-        cronjob.script = `current/${script}`;
+        cronjob.script = `html/current/${script}`;
         cronjob.parameters = parameters;
     }
     else {
