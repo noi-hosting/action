@@ -51327,7 +51327,6 @@ exports.pruneDatabases = pruneDatabases;
 exports.pruneBranches = pruneBranches;
 const client = __importStar(__nccwpck_require__(1033));
 const core = __importStar(__nccwpck_require__(9093));
-const node_process_1 = __importDefault(__nccwpck_require__(7742));
 const wait_1 = __nccwpck_require__(5722);
 const _ = __importStar(__nccwpck_require__(7337));
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
@@ -51393,7 +51392,7 @@ async function findOrCreateWebspace(webspaceName, app, users, pool) {
             console.error(`SSH key under "${userName} is not supported`);
             continue;
         }
-        const requiredAccessRole = node_process_1.default.env.ACCESS_ROLE_SSH ?? 'contributor';
+        const requiredAccessRole = core.getInput('access-role-ssh');
         if (!['admin', 'contributor'].includes(requiredAccessRole)) {
             console.error(`Access role "${requiredAccessRole} is not supported`);
             continue;
@@ -51613,9 +51612,9 @@ async function pruneBranches(projectPrefix) {
     }
 }
 function translateDomainName(domainName, environment, config, app) {
-    let defaultDomainName = node_process_1.default.env.DOMAIN_NAME ?? '';
+    let defaultDomainName = core.getInput('default-domain-name');
     const previewDomain = config.project.domain ?? null;
-    if (null !== previewDomain && '' === defaultDomainName) {
+    if ('' === defaultDomainName && null !== previewDomain) {
         defaultDomainName = previewDomain;
     }
     if ('' === defaultDomainName) {

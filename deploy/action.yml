@@ -34,6 +34,14 @@ inputs:
     description: Shell script for building environment before deployment
   with-node:
     description: The node version, if your build hook uses node at all.
+  access-role-ssh:
+    description: The role required to access this environment's SSH.
+    required: false
+    default: 'contributor'
+  default-domain-name:
+    description: The domain name attached to this environment, i.e., the replacement for {default}.
+    required: false
+    default: ''
 
 outputs:
   public-url:
@@ -80,6 +88,8 @@ runs:
         app: ${{ inputs.app }}
         project-prefix: ${{ inputs.project-prefix }}
         ssh-public-key: ${{ inputs.ssh-public-key }}
+        default-domain-name: ${{ inputs.default-domain-name }}
+        access-role-ssh: ${{ inputs.access-role-ssh }}
         keep-branches: ${{steps.branch-names.outputs.result}}
 
     # Sync app

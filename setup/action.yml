@@ -23,6 +23,14 @@ inputs:
     description: Coma-separated list of existing branches/environments, all other environments get pruned if configured.
     required: false
     default: ''
+  access-role-ssh:
+    description: The role required to access this environment's SSH.
+    required: false
+    default: 'contributor'
+  default-domain-name:
+    description: The domain name attached to this environment, i.e., the replacement for {default}.
+    required: false
+    default: ''
 
 outputs:
   ssh-user:

@@ -24,7 +24,7 @@ jobs:
   check-dist:
     strategy:
       matrix:
-        action: [ setup ]
+        action: [setup]
 
     name: Check dist/
     runs-on: ubuntu-latest

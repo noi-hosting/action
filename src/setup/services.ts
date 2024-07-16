@@ -1,6 +1,5 @@
 import * as client from '../api-client'
 import * as core from '@actions/core'
-import process from 'node:process'
 import { wait } from '../wait'
 import * as _ from 'lodash'
 import crypto from 'crypto'
@@ -136,7 +135,7 @@ export async function findOrCreateWebspace(
       continue
     }
 
-    const requiredAccessRole = process.env.ACCESS_ROLE_SSH ?? 'contributor'
+    const requiredAccessRole = core.getInput('access-role-ssh')
     if (!['admin', 'contributor'].includes(requiredAccessRole)) {
       console.error(`Access role "${requiredAccessRole} is not supported`)
       continue
@@ -471,9 +470,9 @@ export async function pruneBranches(projectPrefix: string): Promise<void> {
 }
 
 function translateDomainName(domainName: string, environment: string, config: Config, app: string): string {
-  let defaultDomainName = process.env.DOMAIN_NAME ?? ''
+  let defaultDomainName = core.getInput('default-domain-name')
   const previewDomain = config.project.domain ?? null
-  if (null !== previewDomain && '' === defaultDomainName) {
+  if ('' === defaultDomainName && null !== previewDomain) {
     defaultDomainName = previewDomain
   }
 
