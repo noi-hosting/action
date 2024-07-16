@@ -51579,7 +51579,8 @@ async function pruneDatabases(config, databasePrefix, foundDatabases) {
     }
 }
 async function pruneBranches(projectPrefix) {
-    const branches = (node_process_1.default.env.REPO_BRANCHES ?? '').split(' ');
+    const branches = core.getInput('keep-branches').split(',');
+    core.info(branches.toString());
     if (branches.length < 2) {
         return;
     }

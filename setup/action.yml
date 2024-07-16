@@ -19,6 +19,10 @@ inputs:
   ssh-public-key:
     description: The SSH public key that matches the private key configured for deploying.
     required: true
+  keep-branches:
+    description: Coma-separated list of existing branches/environments, all other environments get pruned if configured.
+    required: false
+    default: ''
 
 outputs:
   ssh-user:

@@ -56,17 +56,19 @@ runs:
         echo "::error title=⛔ error hint::auth-token is empty, maybe you need to populate it in the secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encrypted-secrets"
         exit 1
 
-    # Explicitly use fetch-depth=0 to fetch all branches
     - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
 
     # Gather all branches, we need the list to prune non-existing branches
-    - name: Gather all branches
-      shell: bash
-      run: |
-        echo REPO_BRANCHES=$(git branch -r --format='%(refname:short)' | sed 's|origin/||g' | tr '\n' ' ') >> "$GITHUB_ENV"
+    - uses: actions/github-script@v7
+      id: branch-names
+      with:
+        result-encoding: string
+        script: |
+          return await github.rest.repos.listBranches({
+            owner: context.repo.owner,
+            repo: context.repo.repo
+          }).then(branches => branches.map(b => b.name).join())
 
     # Create all the web-spaces, vhosts and databases via the Hosting.de API
     - name: Setup Hosting.de environment
@@ -77,6 +79,7 @@ runs:
         app: ${{ inputs.app }}
         project-prefix: ${{ inputs.project-prefix }}
         ssh-public-key: ${{ inputs.ssh-public-key }}
+        keep-branches: ${{steps.branch-names.outputs.result}}
 
     # Sync app
     - name: Sync environments

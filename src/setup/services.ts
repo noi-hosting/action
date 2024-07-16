@@ -434,7 +434,8 @@ export async function pruneDatabases(
 }
 
 export async function pruneBranches(projectPrefix: string): Promise<void> {
-  const branches = (process.env.REPO_BRANCHES ?? '').split(' ')
+  const branches = core.getInput('keep-branches').split(',')
+  core.info(branches.toString())
   if (branches.length < 2) {
     return
   }
