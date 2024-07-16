@@ -157,6 +157,11 @@ runs:
         private-key: ${{ inputs.ssh-private-key }}
         deployer-version: '7.4.0'
 
+    - name: Unlock deployment (Prepare)
+      if: ${{ failure() && steps.deployer.conclusion == 'failure' }}
+      shell: bash
+      run: killall ssh-agent
+
     - name: Unlock deployment
       if: ${{ failure() && steps.deployer.conclusion == 'failure' }}
       uses: deployphp/action@v1
