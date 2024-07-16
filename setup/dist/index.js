@@ -51269,6 +51269,7 @@ async function run() {
         core.setOutput('env-vars', Object.assign(env1, env2, env3));
         core.setOutput('deploy-path', destinations[0].deployPath);
         core.setOutput('public-url', destinations[0].publicUrl);
+        core.info(`Prune: ${JSON.stringify(config.project)}`);
         if (config.project.prune) {
             await services.pruneBranches(projectPrefix);
         }
@@ -51580,7 +51581,6 @@ async function pruneDatabases(config, databasePrefix, foundDatabases) {
 }
 async function pruneBranches(projectPrefix) {
     const branches = core.getInput('keep-branches').split(',');
-    core.info(branches.toString());
     if (branches.length < 2) {
         return;
     }

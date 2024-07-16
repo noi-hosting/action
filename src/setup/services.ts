@@ -435,7 +435,6 @@ export async function pruneDatabases(
 
 export async function pruneBranches(projectPrefix: string): Promise<void> {
   const branches = core.getInput('keep-branches').split(',')
-  core.info(branches.toString())
   if (branches.length < 2) {
     return
   }
