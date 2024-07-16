@@ -4,7 +4,7 @@ import process from 'node:process'
 import { wait } from '../wait'
 import * as _ from 'lodash'
 import crypto from 'crypto'
-import { Config, AppConfig, WebConfig } from '../config'
+import { Config, AppConfig, WebConfig, UsersConfig } from '../config'
 import {
   DatabaseResult,
   transformCronJob,
@@ -18,6 +18,7 @@ import {
 export async function getWebspace(
   webspaceName: string,
   app: AppConfig,
+  users: UsersConfig,
   pool: string | null
 ): Promise<{
   webspace: WebspaceResult
@@ -29,7 +30,7 @@ export async function getWebspace(
     [key: string]: string | boolean | number
   }
 }> {
-  const { webspace, webspaceAccess, isNew } = await findOrCreateWebspace(webspaceName, app, pool)
+  const { webspace, webspaceAccess, isNew } = await findOrCreateWebspace(webspaceName, app, users, pool)
   const envVars: {
     [key: string]: string | boolean | number
   } = {}
@@ -113,6 +114,7 @@ export async function applyDatabases(
 export async function findOrCreateWebspace(
   webspaceName: string,
   app: AppConfig,
+  users: UsersConfig,
   pool: string | null
 ): Promise<{
   webspace: WebspaceResult
@@ -122,17 +124,34 @@ export async function findOrCreateWebspace(
   const redisEnabled = Object.values(app.relationships).includes('redis')
   let webspace: WebspaceResult | null = await client.findOneWebspaceByName(webspaceName)
 
-  const additionalUsers = []
-  for (const [displayName, key] of Object.entries(app.users)) {
-    if (!key.startsWith('ssh-rsa ') || key.split(' ').length > 3) {
-      console.error(`SSH key under "${displayName} is not supported`)
+  const additionalUsers: { displayName: string; fingerprint: string; key: string }[] = []
+  for (const userName of app.users) {
+    const user = users[userName] ?? null
+    if (null === user) {
+      console.error(`User "${userName} not found`)
       continue
     }
 
-    const fingerprint = crypto.createHash('sha512').update(key).digest('hex')
+    if (!user.key.startsWith('ssh-rsa ') || user.key.split(' ').length > 3) {
+      console.error(`SSH key under "${userName} is not supported`)
+      continue
+    }
+
+    const requiredAccessRole = process.env.ACCESS_ROLE_SSH ?? 'contributor'
+    if (!['admin', 'collaborator'].includes(requiredAccessRole)) {
+      console.error(`Access role "${requiredAccessRole} is not supported`)
+      continue
+    }
+
+    if (requiredAccessRole === 'admin' && (user.role ?? 'collaborator') !== 'admin') {
+      continue
+    }
+
+    const fingerprint = crypto.createHash('sha1').update(user.key).digest('hex')
     additionalUsers.push({
-      displayName: `${displayName} #${fingerprint.substring(0, 6)}#`,
-      key
+      displayName: `${userName} #${fingerprint.substring(0, 5)}#`,
+      fingerprint: fingerprint.substring(0, 5),
+      key: user.key
     })
   }
 
@@ -141,7 +160,7 @@ export async function findOrCreateWebspace(
   )
 
   let ghUser = availUsers.find(u => u.name === `github-action--${webspaceName}`) ?? null
-  const users: UserResult[] = []
+  const webspaceUsers: UserResult[] = []
   if (null === ghUser) {
     ghUser = await client.createWebspaceUser(
       `github-action--${webspaceName}`,
@@ -151,14 +170,14 @@ export async function findOrCreateWebspace(
     )
   }
 
-  users.push(ghUser)
+  webspaceUsers.push(ghUser)
 
   for (const user of additionalUsers) {
-    const u = availUsers.find(x => x.name === user.displayName) ?? null
+    const u = availUsers.find(x => x.name.includes(`#${user.fingerprint}#`)) ?? null
     if (null !== u) {
-      users.push(u)
+      webspaceUsers.push(u)
     } else {
-      users.push(await client.createWebspaceUser(user.displayName, user.key))
+      webspaceUsers.push(await client.createWebspaceUser(user.displayName, user.key))
     }
   }
 
@@ -181,10 +200,10 @@ export async function findOrCreateWebspace(
     } else {
       core.info(`Updating webspace ${webspaceName} (${webspace.id})`)
 
-      webspace = await client.updateWebspace(webspace, users, app.php.version, app.cron, redisEnabled)
+      webspace = await client.updateWebspace(webspace, webspaceUsers, app.php.version, app.cron, redisEnabled)
     }
 
-    const webspaceAccess = webspace.accesses.find(a => (ghUser.id = a.userId)) ?? null
+    const webspaceAccess = webspace.accesses.find(a => ghUser?.id === a.userId) ?? null
     if (null === webspaceAccess) {
       throw new Error(`Unexpected error`)
     }
@@ -200,7 +219,7 @@ export async function findOrCreateWebspace(
 
   webspace = await client.createWebspace(
     webspaceName,
-    users,
+    webspaceUsers,
     app.cron,
     app.php.version,
     pool,
@@ -252,7 +271,7 @@ export async function configureVhosts(
 ): Promise<{
   domainName: string
 }> {
-  const actualDomainName = translateDomainName(web.domainName ?? null, ref, config, appKey)
+  const actualDomainName = translateDomainName(web.domainName ?? '{default}', ref, config, appKey)
 
   let vhost = foundVhosts.find(v => v.domainName === actualDomainName) ?? null
   if (null === vhost) {
@@ -441,17 +460,14 @@ export async function pruneBranches(projectPrefix: string): Promise<void> {
   }
 }
 
-function translateDomainName(domainName: string | null, environment: string, config: Config, app: string): string {
-  if (null === domainName) {
-    domainName = process.env.DOMAIN_NAME ?? ''
-  }
-
+function translateDomainName(domainName: string, environment: string, config: Config, app: string): string {
+  let defaultDomainName = process.env.DOMAIN_NAME ?? ''
   const previewDomain = config.project.domain ?? null
-  if (null !== previewDomain && ('' === domainName || environment !== (config.project?.parent ?? ''))) {
-    domainName = previewDomain
+  if (null !== previewDomain && '' === defaultDomainName) {
+    defaultDomainName = previewDomain
   }
 
-  if ('' === domainName) {
+  if ('' === defaultDomainName) {
     throw new Error(
       `No domain name configured for the app defined under "applications.${app}". ` +
         `Please provide the a variable named "DOMAIN_NAME" under Github's environment settings. ` +
@@ -463,7 +479,10 @@ function translateDomainName(domainName: string | null, environment: string, con
   //   return web.environments[environment]
   // }
 
-  return domainName.replace(/\{app}/gi, app).replace(/\{ref}/gi, environment)
+  return domainName
+    .replace(/\{default}/gi, defaultDomainName)
+    .replace(/\{app}/gi, app)
+    .replace(/\{ref}/gi, environment)
 }
 
 function getPrivileges(accessLevel: string[]): string {

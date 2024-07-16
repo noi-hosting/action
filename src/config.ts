@@ -4,6 +4,7 @@ import fs from 'fs'
 export async function readConfig(appKey: string): Promise<{
   config: Config
   app: AppConfig | null
+  users: UsersConfig
   envVars: {
     [key: string]: string | boolean | number
   }
@@ -13,7 +14,8 @@ export async function readConfig(appKey: string): Promise<{
       project: {
         pool: null,
         prune: true
-      }
+      },
+      users: {}
     },
     yaml.load(fs.readFileSync('./.hosting/config.yaml', 'utf8')) as Config
   )
@@ -32,7 +34,7 @@ export async function readConfig(appKey: string): Promise<{
         web: {
           locations: {}
         },
-        users: {},
+        users: [],
         cron: [],
         sync: []
       },
@@ -45,6 +47,7 @@ export async function readConfig(appKey: string): Promise<{
   return {
     config,
     app,
+    users: config.users,
     envVars
   }
 }
@@ -85,9 +88,7 @@ interface AppConfig {
   web: WebConfig[]
   sync: string[]
   cron: CronjobConfig[]
-  users: {
-    [displayName: string]: string
-  }
+  users: string[]
 }
 
 interface WebConfig {
@@ -103,6 +104,13 @@ interface WebConfig {
   }
 }
 
+interface UsersConfig {
+  [userName: string]: {
+    role: string
+    key: string
+  }
+}
+
 interface CronjobConfig {
   php?: string
   cmd?: string
@@ -110,4 +118,4 @@ interface CronjobConfig {
   on: string
 }
 
-export { Config, AppConfig, WebConfig, CronjobConfig }
+export { Config, AppConfig, WebConfig, CronjobConfig, UsersConfig }

@@ -29,7 +29,7 @@ export async function run(): Promise<void> {
 
     const webspaceName = `${projectPrefix}-${ref}-${appKey}`
     const databasePrefix = `${projectPrefix}-${ref}`
-    const { config, app, envVars: env1 } = await readConfig(appKey)
+    const { config, app, users, envVars: env1 } = await readConfig(appKey)
     if (null === app) {
       throw new Error(`Cannot find "applications.${appKey}" in the ".hosting/config.yaml" file.`)
     }
@@ -69,7 +69,7 @@ export async function run(): Promise<void> {
       sshUser,
       httpUser,
       envVars: env2
-    } = await services.getWebspace(webspaceName, app, config.project.pool)
+    } = await services.getWebspace(webspaceName, app, users, config.project.pool)
 
     // await _http.postJson(
     //     `https://console.noi-hosting.de/api/register-preview-domain`,

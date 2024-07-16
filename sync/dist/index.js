@@ -30832,7 +30832,8 @@ async function readConfig(appKey) {
         project: {
             pool: null,
             prune: true
-        }
+        },
+        users: {}
     }, yaml.load(fs_1.default.readFileSync('./.hosting/config.yaml', 'utf8')));
     let app = null;
     if (appKey in config.applications) {
@@ -30847,7 +30848,7 @@ async function readConfig(appKey) {
             web: {
                 locations: {}
             },
-            users: {},
+            users: [],
             cron: [],
             sync: []
         }, config.applications[appKey]);
@@ -30856,6 +30857,7 @@ async function readConfig(appKey) {
     return {
         config,
         app,
+        users: config.users,
         envVars
     };
 }

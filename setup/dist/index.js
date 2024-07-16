@@ -51090,7 +51090,8 @@ async function readConfig(appKey) {
         project: {
             pool: null,
             prune: true
-        }
+        },
+        users: {}
     }, yaml.load(fs_1.default.readFileSync('./.hosting/config.yaml', 'utf8')));
     let app = null;
     if (appKey in config.applications) {
@@ -51105,7 +51106,7 @@ async function readConfig(appKey) {
             web: {
                 locations: {}
             },
-            users: {},
+            users: [],
             cron: [],
             sync: []
         }, config.applications[appKey]);
@@ -51114,6 +51115,7 @@ async function readConfig(appKey) {
     return {
         config,
         app,
+        users: config.users,
         envVars
     };
 }
@@ -51180,7 +51182,7 @@ async function run() {
         }
         const webspaceName = `${projectPrefix}-${ref}-${appKey}`;
         const databasePrefix = `${projectPrefix}-${ref}`;
-        const { config, app, envVars: env1 } = await (0, config_1.readConfig)(appKey);
+        const { config, app, users, envVars: env1 } = await (0, config_1.readConfig)(appKey);
         if (null === app) {
             throw new Error(`Cannot find "applications.${appKey}" in the ".hosting/config.yaml" file.`);
         }
@@ -51210,7 +51212,7 @@ async function run() {
         for (const [k, v] of Object.entries(env1)) {
             core.exportVariable(k, v);
         }
-        const { webspace, isNew: isNewWebspace, sshHost, sshUser, httpUser, envVars: env2 } = await services.getWebspace(webspaceName, app, config.project.pool);
+        const { webspace, isNew: isNewWebspace, sshHost, sshUser, httpUser, envVars: env2 } = await services.getWebspace(webspaceName, app, users, config.project.pool);
         // await _http.postJson(
         //     `https://console.noi-hosting.de/api/register-preview-domain`,
         //     {
@@ -51295,8 +51297,8 @@ const wait_1 = __nccwpck_require__(5722);
 const _ = __importStar(__nccwpck_require__(7337));
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
 const api_client_1 = __nccwpck_require__(1033);
-async function getWebspace(webspaceName, app, pool) {
-    const { webspace, webspaceAccess, isNew } = await findOrCreateWebspace(webspaceName, app, pool);
+async function getWebspace(webspaceName, app, users, pool) {
+    const { webspace, webspaceAccess, isNew } = await findOrCreateWebspace(webspaceName, app, users, pool);
     const envVars = {};
     const redisRelationName = Object.keys(app.relationships).find(key => 'redis' === app.relationships[key]) ?? null;
     if (null !== redisRelationName) {
@@ -51342,37 +51344,51 @@ async function applyDatabases(databasePrefix, appKey, app, config) {
         envVars
     };
 }
-async function findOrCreateWebspace(webspaceName, app, pool) {
+async function findOrCreateWebspace(webspaceName, app, users, pool) {
     const redisEnabled = Object.values(app.relationships).includes('redis');
     let webspace = await client.findOneWebspaceByName(webspaceName);
     const additionalUsers = [];
-    for (const [displayName, key] of Object.entries(app.users)) {
-        if (!key.startsWith('ssh-rsa ') || key.split(' ').length > 3) {
-            console.error(`SSH key under "${displayName} is not supported`);
+    for (const userName of app.users) {
+        const user = users[userName] ?? null;
+        if (null === user) {
+            console.error(`User "${userName} not found`);
             continue;
         }
-        const fingerprint = crypto_1.default.createHash('sha512').update(key).digest('hex');
+        if (!user.key.startsWith('ssh-rsa ') || user.key.split(' ').length > 3) {
+            console.error(`SSH key under "${userName} is not supported`);
+            continue;
+        }
+        const requiredAccessRole = node_process_1.default.env.ACCESS_ROLE_SSH ?? 'contributor';
+        if (!['admin', 'collaborator'].includes(requiredAccessRole)) {
+            console.error(`Access role "${requiredAccessRole} is not supported`);
+            continue;
+        }
+        if (requiredAccessRole === 'admin' && (user.role ?? 'collaborator') !== 'admin') {
+            continue;
+        }
+        const fingerprint = crypto_1.default.createHash('sha1').update(user.key).digest('hex');
         additionalUsers.push({
-            displayName: `${displayName} #${fingerprint.substring(0, 6)}#`,
-            key
+            displayName: `${userName} #${fingerprint.substring(0, 5)}#`,
+            fingerprint: fingerprint.substring(0, 5),
+            key: user.key
         });
     }
     const availUsers = await client.findUsersByName([`github-action--${webspaceName}`].concat(additionalUsers.map(x => x.displayName)));
     let ghUser = availUsers.find(u => u.name === `github-action--${webspaceName}`) ?? null;
-    const users = [];
+    const webspaceUsers = [];
     if (null === ghUser) {
         ghUser = await client.createWebspaceUser(`github-action--${webspaceName}`, core.getInput('ssh-public-key', {
             required: true
         }));
     }
-    users.push(ghUser);
+    webspaceUsers.push(ghUser);
     for (const user of additionalUsers) {
-        const u = availUsers.find(x => x.name === user.displayName) ?? null;
+        const u = availUsers.find(x => x.name.includes(`#${user.fingerprint}#`)) ?? null;
         if (null !== u) {
-            users.push(u);
+            webspaceUsers.push(u);
         }
         else {
-            users.push(await client.createWebspaceUser(user.displayName, user.key));
+            webspaceUsers.push(await client.createWebspaceUser(user.displayName, user.key));
         }
     }
     if (null !== webspace) {
@@ -51387,9 +51403,9 @@ async function findOrCreateWebspace(webspaceName, app, pool) {
         }
         else {
             core.info(`Updating webspace ${webspaceName} (${webspace.id})`);
-            webspace = await client.updateWebspace(webspace, users, app.php.version, app.cron, redisEnabled);
+            webspace = await client.updateWebspace(webspace, webspaceUsers, app.php.version, app.cron, redisEnabled);
         }
-        const webspaceAccess = webspace.accesses.find(a => (ghUser.id = a.userId)) ?? null;
+        const webspaceAccess = webspace.accesses.find(a => ghUser?.id === a.userId) ?? null;
         if (null === webspaceAccess) {
             throw new Error(`Unexpected error`);
         }
@@ -51400,7 +51416,7 @@ async function findOrCreateWebspace(webspaceName, app, pool) {
         };
     }
     core.info('Creating a new webspace...');
-    webspace = await client.createWebspace(webspaceName, users, app.cron, app.php.version, pool, app.account, redisEnabled);
+    webspace = await client.createWebspace(webspaceName, webspaceUsers, app.cron, app.php.version, pool, app.account, redisEnabled);
     do {
         await (0, wait_1.wait)(2000);
         core.info(`Waiting for webspace ${webspaceName} (${webspace.id}) to boot...`);
@@ -51428,7 +51444,7 @@ async function getWebspaceAccess(webspace) {
     return webspaceAccess;
 }
 async function configureVhosts(web, app, ref, config, appKey, foundVhosts, webspace, phpVersion) {
-    const actualDomainName = translateDomainName(web.domainName ?? null, ref, config, appKey);
+    const actualDomainName = translateDomainName(web.domainName ?? '{default}', ref, config, appKey);
     let vhost = foundVhosts.find(v => v.domainName === actualDomainName) ?? null;
     if (null === vhost) {
         core.info(`Configuring ${actualDomainName}...`);
@@ -51554,14 +51570,12 @@ async function pruneBranches(projectPrefix) {
     }
 }
 function translateDomainName(domainName, environment, config, app) {
-    if (null === domainName) {
-        domainName = node_process_1.default.env.DOMAIN_NAME ?? '';
-    }
+    let defaultDomainName = node_process_1.default.env.DOMAIN_NAME ?? '';
     const previewDomain = config.project.domain ?? null;
-    if (null !== previewDomain && ('' === domainName || environment !== (config.project?.parent ?? ''))) {
-        domainName = previewDomain;
+    if (null !== previewDomain && '' === defaultDomainName) {
+        defaultDomainName = previewDomain;
     }
-    if ('' === domainName) {
+    if ('' === defaultDomainName) {
         throw new Error(`No domain name configured for the app defined under "applications.${app}". ` +
             `Please provide the a variable named "DOMAIN_NAME" under Github's environment settings. ` +
             `Alternatively, set the domain name via "applications.${app}.web.locations[].domainName".`);
@@ -51570,7 +51584,10 @@ function translateDomainName(domainName, environment, config, app) {
     // if (null !== (web.environments ?? null) && environment in web.environments) {
     //   return web.environments[environment]
     // }
-    return domainName.replace(/\{app}/gi, app).replace(/\{ref}/gi, environment);
+    return domainName
+        .replace(/\{default}/gi, defaultDomainName)
+        .replace(/\{app}/gi, app)
+        .replace(/\{ref}/gi, environment);
 }
 function getPrivileges(accessLevel) {
     if (accessLevel.includes('read') && accessLevel.includes('write') && accessLevel.includes('schema')) {
