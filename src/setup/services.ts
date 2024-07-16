@@ -493,8 +493,8 @@ function translateDomainName(domainName: string, environment: string, config: Co
   return domainName
     .replace(/\{default}/gi, defaultDomainName)
     .replace(/\{app}/gi, app)
-    .replace(/\//gi, '--')
     .replace(/\{ref}/gi, environment)
+    .replace(/\//gi, '--')
 }
 
 function mustBeUpdated(vhost: VhostResult, app: AppConfig, web: WebConfig): boolean {

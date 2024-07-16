@@ -51628,8 +51628,8 @@ function translateDomainName(domainName, environment, config, app) {
     return domainName
         .replace(/\{default}/gi, defaultDomainName)
         .replace(/\{app}/gi, app)
-        .replace(/\//gi, '--')
-        .replace(/\{ref}/gi, environment);
+        .replace(/\{ref}/gi, environment)
+        .replace(/\//gi, '--');
 }
 function mustBeUpdated(vhost, app, web) {
     if (app.php.version !== vhost.phpVersion) {
