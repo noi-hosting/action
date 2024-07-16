@@ -135,7 +135,7 @@ export async function findOrCreateWebspace(
       continue
     }
 
-    const requiredAccessRole = core.getInput('access-role-ssh') ?? 'contributor'
+    const requiredAccessRole = core.getInput('access-role-ssh') ? core.getInput('access-role-ssh') : 'contributor'
     if (!['admin', 'contributor'].includes(requiredAccessRole)) {
       console.error(`Access role "${requiredAccessRole} is not supported`)
       continue

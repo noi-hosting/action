@@ -51042,14 +51042,14 @@ function transformCronJob(config, phpVersion) {
     if (config.php !== undefined && config.php !== null) {
         const [script, ...parameters] = config.php.split(' ');
         cronjob.type = 'php';
-        cronjob.script = script;
+        cronjob.script = `current/${script}`;
         cronjob.parameters = parameters;
         cronjob.interpreterVersion = phpVersion;
     }
     else if (config.cmd !== undefined && config.cmd !== null) {
         const [script, ...parameters] = config.cmd.split(' ');
         cronjob.type = 'bash';
-        cronjob.script = script;
+        cronjob.script = `current/${script}`;
         cronjob.parameters = parameters;
     }
     else {
@@ -51392,7 +51392,7 @@ async function findOrCreateWebspace(webspaceName, app, users, pool) {
             console.error(`SSH key under "${userName} is not supported`);
             continue;
         }
-        const requiredAccessRole = core.getInput('access-role-ssh') ?? 'contributor';
+        const requiredAccessRole = core.getInput('access-role-ssh') ? core.getInput('access-role-ssh') : 'contributor';
         if (!['admin', 'contributor'].includes(requiredAccessRole)) {
             console.error(`Access role "${requiredAccessRole} is not supported`);
             continue;
