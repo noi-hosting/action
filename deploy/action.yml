@@ -146,6 +146,7 @@ runs:
     # Run deployer
     - name: Deploy
       uses: deployphp/action@v1
+      id: deployer
       with:
         dep:
           deploy -o remote_user=${{ steps.hosting.outputs.ssh-user }} -o hostname=${{ steps.hosting.outputs.ssh-host }}
@@ -153,5 +154,17 @@ runs:
           deploy_path=${{ steps.hosting.outputs.deploy-path }} -o web_url=${{ steps.hosting.outputs.public-url }} -o
           forward_agent=false -o repository=https://x-access-token:${{ inputs.gh-token }}@github.com/${{
           github.repository }}.git
+        private-key: ${{ inputs.ssh-private-key }}
+        deployer-version: '7.4.0'
+
+    - name: Unlock deployment
+      if: ${{ failure() && steps.deployer.conclusion == 'failure' }}
+      uses: deployphp/action@v1
+      with:
+        dep:
+          deploy:unlock -o remote_user=${{ steps.hosting.outputs.ssh-user }} -o hostname=${{
+          steps.hosting.outputs.ssh-host }} -o port=${{ steps.hosting.outputs.ssh-port }} -o http_user=${{
+          steps.hosting.outputs.http-user }} -o deploy_path=${{ steps.hosting.outputs.deploy-path }} -o
+          forward_agent=false
         private-key: ${{ inputs.ssh-private-key }}
         deployer-version: '7.4.0'

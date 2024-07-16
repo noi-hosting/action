@@ -367,7 +367,7 @@ export async function configureDatabases(
         database: createdDatabase,
         databaseUserName,
         databasePassword
-      } = await client.createDatabase(dbUserName, databaseInternalName, config.project.pool)
+      } = await client.createDatabase(`${dbUserName}.v1}`, databaseInternalName, config.project.pool)
 
       let database: DatabaseResult | null = createdDatabase
       do {

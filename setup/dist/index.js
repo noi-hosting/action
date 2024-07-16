@@ -51536,7 +51536,7 @@ async function configureDatabases(config, app, databasePrefix, appKey, foundData
         }
         else {
             core.info(`Creating database ${databaseInternalName}`);
-            const { database: createdDatabase, databaseUserName, databasePassword } = await client.createDatabase(dbUserName, databaseInternalName, config.project.pool);
+            const { database: createdDatabase, databaseUserName, databasePassword } = await client.createDatabase(`${dbUserName}.v1}`, databaseInternalName, config.project.pool);
             let database = createdDatabase;
             do {
                 await (0, wait_1.wait)(2000);
