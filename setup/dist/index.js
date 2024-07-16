@@ -51494,7 +51494,8 @@ async function configureVhosts(web, app, ref, config, appKey, foundVhosts, websp
     };
 }
 async function pruneVhosts(foundVhosts, app, ref, config, appKey) {
-    for (const relict of foundVhosts.filter(v => app.web.map(web => translateDomainName(web.domainName ?? '{default}', ref, config, appKey)).includes(v.domainName))) {
+    const allowedDomainNames = app.web.map(web => translateDomainName(web.domainName ?? '{default}', ref, config, appKey));
+    for (const relict of foundVhosts.filter(v => !allowedDomainNames.includes(v.domainName))) {
         core.info(`Deleting ${relict.domainName}...`);
         await client.deleteVhostById(relict.id);
         await (0, wait_1.wait)(2000);
