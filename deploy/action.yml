@@ -131,7 +131,7 @@ runs:
         USER_DOTENV: ${{ inputs.dotenv }}
       run: |
         HOSTING_ENV=$(echo '${{ steps.hosting.outputs.env-vars }}' | jq -r 'to_entries[] | "\(.key)=\(.value)"')
-        HOSTING_ENV=$HOSTING_ENV"\n"$USER_DOTENV
+        HOSTING_ENV=$HOSTING_ENV"\n"$(echo $USER_DOTENV | envsubst)
 
         ssh -l "${{ steps.hosting.outputs.ssh-user }}" -p "${{ steps.hosting.outputs.ssh-port }}" "${{ steps.hosting.outputs.ssh-host }}" -o StrictHostKeyChecking=no "mkdir -p ${{ steps.hosting.outputs.deploy-path }}/shared && touch ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-file }}"
         echo -e "$HOSTING_ENV" | ssh -l "${{ steps.hosting.outputs.ssh-user }}" -p "${{ steps.hosting.outputs.ssh-port }}" "${{ steps.hosting.outputs.ssh-host }}" -o StrictHostKeyChecking=no -T "cat >> ${{ steps.hosting.outputs.deploy-path }}/shared/${{ inputs.dotenv-file }}"
