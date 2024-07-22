@@ -51197,8 +51197,6 @@ const github = __importStar(__nccwpck_require__(5942));
 const services = __importStar(__nccwpck_require__(122));
 const process = __importStar(__nccwpck_require__(7742));
 const config_1 = __nccwpck_require__(9598);
-// import { TypedResponse } from '@actions/http-client/lib/interfaces'
-// import { HttpClient } from '@actions/http-client'
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
 /**
  * The main function for the action.
@@ -51243,10 +51241,6 @@ async function run() {
         // } else {
         //   throw new Error(`No license provided or license key "${license}" is invalid.`)
         // }
-        // Export environment variables for build hook
-        for (const [k, v] of Object.entries(env1)) {
-            core.exportVariable(k, v);
-        }
         const { webspace, isNew: isNewWebspace, sshHost, sshUser, httpUser, envVars: env2 } = await services.getWebspace(webspaceName, app, users, config.project.pool);
         // await _http.postJson(
         //     `https://console.noi-hosting.de/api/register-preview-domain`,
@@ -51272,6 +51266,19 @@ async function run() {
         core.setOutput('env-vars', Object.assign(env0, env1, env2, env3));
         core.setOutput('deploy-path', destinations[0].deployPath);
         core.setOutput('public-url', destinations[0].publicUrl);
+        core.setOutput('destinations', destinations);
+        // Export environment variables for build hook
+        for (const [k, v] of Object.entries(env1)) {
+            core.exportVariable(k, v);
+        }
+        core.exportVariable('HOSTING_SSH_USER', sshUser);
+        core.exportVariable('HOSTING_SSH_HOST', sshHost);
+        core.exportVariable('HOSTING_SSH_PORT', 2244);
+        core.exportVariable('HOSTING_HTTP_USER', httpUser);
+        core.exportVariable('HOSTING_PHP_VERSION', phpVersion);
+        core.exportVariable('HOSTING_PHP_EXTENSIONS', phpExtensions.join(', '));
+        core.exportVariable('HOSTING_DEPLOY_PATH', destinations[0].deployPath);
+        core.exportVariable('HOSTING_PUBLIC_URL', destinations[1].publicUrl);
         if (config.project.prune) {
             await services.pruneBranches(projectPrefix);
         }
@@ -51321,7 +51328,6 @@ exports.getWebspace = getWebspace;
 exports.applyVhosts = applyVhosts;
 exports.applyDatabases = applyDatabases;
 exports.findOrCreateWebspace = findOrCreateWebspace;
-exports.getWebspaceAccess = getWebspaceAccess;
 exports.configureVhosts = configureVhosts;
 exports.pruneVhosts = pruneVhosts;
 exports.configureDatabases = configureDatabases;
@@ -51461,7 +51467,7 @@ async function findOrCreateWebspace(webspaceName, app, users, pool) {
             throw new Error(`Unexpected error.`);
         }
     } while ('active' !== webspace.status);
-    const webspaceAccess = webspace.accesses.find(a => (ghUser.id = a.userId)) ?? null;
+    const webspaceAccess = webspace.accesses.find(a => ghUser?.id === a.userId) ?? null;
     if (null === webspaceAccess) {
         throw new Error(`Unexpected error`);
     }
@@ -51470,14 +51476,6 @@ async function findOrCreateWebspace(webspaceName, app, users, pool) {
         webspaceAccess,
         isNew: true
     };
-}
-async function getWebspaceAccess(webspace) {
-    const availableUsers = await client.findUsersByName('github-action--*');
-    const webspaceAccess = webspace.accesses.find(a => availableUsers.find(u => u.id === a.userId)) ?? null;
-    if (null === webspaceAccess) {
-        throw new Error(`It seems that the SSH access to the webspace was revoked for the github-action.`);
-    }
-    return webspaceAccess;
 }
 async function configureVhosts(web, app, ref, config, appKey, foundVhosts, webspace, phpVersion) {
     const actualDomainName = translateDomainName(web.domainName ?? '{default}', ref, config, appKey);

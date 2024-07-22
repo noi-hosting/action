@@ -234,7 +234,7 @@ export async function findOrCreateWebspace(
     }
   } while ('active' !== webspace.status)
 
-  const webspaceAccess = webspace.accesses.find(a => (ghUser.id = a.userId)) ?? null
+  const webspaceAccess = webspace.accesses.find(a => ghUser?.id === a.userId) ?? null
   if (null === webspaceAccess) {
     throw new Error(`Unexpected error`)
   }
@@ -244,17 +244,6 @@ export async function findOrCreateWebspace(
     webspaceAccess,
     isNew: true
   }
-}
-
-export async function getWebspaceAccess(webspace: WebspaceResult): Promise<WebspaceAccess> {
-  const availableUsers = await client.findUsersByName('github-action--*')
-  const webspaceAccess = webspace.accesses.find(a => availableUsers.find(u => u.id === a.userId)) ?? null
-
-  if (null === webspaceAccess) {
-    throw new Error(`It seems that the SSH access to the webspace was revoked for the github-action.`)
-  }
-
-  return webspaceAccess
 }
 
 export async function configureVhosts(

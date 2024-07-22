@@ -45,6 +45,10 @@ outputs:
     description: Deploy path to set for Deployer action.
   public-url:
     description: The URL under that the deployment will be reachable.
+  destinations:
+    description:
+      All destinations in the format { deploy-path, public-url}[]. Helpful, if more than one web destination was
+      defined.
   env-vars:
     description: Environment variables to set on the host (json encoded).
   php-version:

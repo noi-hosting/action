@@ -5,8 +5,6 @@ import * as github from '@actions/github'
 import * as services from './services'
 import * as process from 'node:process'
 import { readConfig } from '../config'
-// import { TypedResponse } from '@actions/http-client/lib/interfaces'
-// import { HttpClient } from '@actions/http-client'
 import crypto from 'crypto'
 
 /**
@@ -57,11 +55,6 @@ export async function run(): Promise<void> {
     //   throw new Error(`No license provided or license key "${license}" is invalid.`)
     // }
 
-    // Export environment variables for build hook
-    for (const [k, v] of Object.entries(env1)) {
-      core.exportVariable(k, v)
-    }
-
     const {
       webspace,
       isNew: isNewWebspace,
@@ -105,6 +98,20 @@ export async function run(): Promise<void> {
     core.setOutput('env-vars', Object.assign(env0, env1, env2, env3))
     core.setOutput('deploy-path', destinations[0].deployPath)
     core.setOutput('public-url', destinations[0].publicUrl)
+    core.setOutput('destinations', destinations)
+
+    // Export environment variables for build hook
+    for (const [k, v] of Object.entries(env1)) {
+      core.exportVariable(k, v)
+    }
+    core.exportVariable('HOSTING_SSH_USER', sshUser)
+    core.exportVariable('HOSTING_SSH_HOST', sshHost)
+    core.exportVariable('HOSTING_SSH_PORT', 2244)
+    core.exportVariable('HOSTING_HTTP_USER', httpUser)
+    core.exportVariable('HOSTING_PHP_VERSION', phpVersion)
+    core.exportVariable('HOSTING_PHP_EXTENSIONS', phpExtensions.join(', '))
+    core.exportVariable('HOSTING_DEPLOY_PATH', destinations[0].deployPath)
+    core.exportVariable('HOSTING_PUBLIC_URL', destinations[1].publicUrl)
 
     if (config.project.prune) {
       await services.pruneBranches(projectPrefix)

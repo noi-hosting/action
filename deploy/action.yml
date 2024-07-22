@@ -170,20 +170,3 @@ runs:
           }}.git
         private-key: ${{ inputs.ssh-private-key }}
         deployer-version: '7.4.0'
-
-    - name: Unlock deployment (Prepare)
-      if: ${{ failure() && steps.deployer.conclusion == 'failure' }}
-      shell: bash
-      run: killall ssh-agent
-
-    - name: Unlock deployment
-      if: ${{ failure() && steps.deployer.conclusion == 'failure' }}
-      uses: deployphp/action@v1
-      with:
-        dep:
-          deploy:unlock -o remote_user=${{ steps.hosting.outputs.ssh-user }} -o hostname=${{
-          steps.hosting.outputs.ssh-host }} -o port=${{ steps.hosting.outputs.ssh-port }} -o http_user=${{
-          steps.hosting.outputs.http-user }} -o deploy_path=${{ steps.hosting.outputs.deploy-path }} -o
-          forward_agent=false
-        private-key: ${{ inputs.ssh-private-key }}
-        deployer-version: '7.4.0'
