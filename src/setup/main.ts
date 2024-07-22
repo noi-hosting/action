@@ -111,7 +111,7 @@ export async function run(): Promise<void> {
     core.exportVariable('HOSTING_PHP_VERSION', phpVersion)
     core.exportVariable('HOSTING_PHP_EXTENSIONS', phpExtensions.join(', '))
     core.exportVariable('HOSTING_DEPLOY_PATH', destinations[0].deployPath)
-    core.exportVariable('HOSTING_PUBLIC_URL', destinations[1].publicUrl)
+    core.exportVariable('HOSTING_PUBLIC_URL', destinations[0].publicUrl)
 
     if (config.project.prune) {
       await services.pruneBranches(projectPrefix)
