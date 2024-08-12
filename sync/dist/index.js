@@ -52445,7 +52445,7 @@ async function run() {
         }
         const shallSyncFiles = core.getBooleanInput('files');
         const shallSyncDatabases = core.getBooleanInput('databases');
-        const databaseNames = core.getInput('limit-database').split(' ');
+        const databaseNames = core.getInput('limit-database').split(' ').filter(Boolean);
         const { config, app } = await (0, config_1.readConfig)(appKey);
         let fromEnv = core.getInput('from', {
             required: false
@@ -52469,7 +52469,7 @@ async function run() {
         if (shallSyncDatabases) {
             core.info(`Syncing databases from environment "${fromEnv}" to environment "${toEnv}"`);
             if (databaseNames.length > 0) {
-                core.info(`Limiting to databases: ${JSON.stringify(databaseNames)}"`);
+                core.info(`Limiting to databases: ${JSON.stringify(databaseNames)}`);
             }
             await (0, services_1.syncDatabases)(config, projectPrefix, fromEnv, toEnv, app, appKey, databaseNames);
         }
