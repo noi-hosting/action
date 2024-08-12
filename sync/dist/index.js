@@ -52561,6 +52561,9 @@ async function syncDatabases(config, projectPrefix, fromEnv, toEnv, app, appToSy
             (databasesToSync.length === 0 || databasesToSync.includes(d.split(':')[1] ?? appToSync)))) {
             const endpoint = relation.split(':')[1] ?? appToSync;
             const [schema] = (config.databases?.endpoints[endpoint] ?? '').split(':');
+            if ('' === schema) {
+                throw new Error(`Invalid database endpoint "${endpoint}".`);
+            }
             dbQueries.push(`${projectPrefix}-${fromEnv}-${schema}`);
             dbQueries.push(`${projectPrefix}-${toEnv}-${schema}`);
         }
@@ -52569,6 +52572,7 @@ async function syncDatabases(config, projectPrefix, fromEnv, toEnv, app, appToSy
         throw new Error(`Cannot find "applications.${appToSync}" in the ".hosting/config.yaml" file.`);
     }
     if (!dbQueries.length) {
+        core.info(`No databases found. Queries used: ${JSON.stringify(dbQueries)}`);
         return;
     }
     const migrations = {};

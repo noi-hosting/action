@@ -73,6 +73,10 @@ export async function syncDatabases(
       const endpoint = relation.split(':')[1] ?? appToSync
       const [schema] = (config.databases?.endpoints[endpoint] ?? '').split(':')
 
+      if ('' === schema) {
+        throw new Error(`Invalid database endpoint "${endpoint}".`)
+      }
+
       dbQueries.push(`${projectPrefix}-${fromEnv}-${schema}`)
       dbQueries.push(`${projectPrefix}-${toEnv}-${schema}`)
     }
@@ -81,6 +85,7 @@ export async function syncDatabases(
   }
 
   if (!dbQueries.length) {
+    core.info(`No databases found. Queries used: ${JSON.stringify(dbQueries)}`)
     return
   }
 
