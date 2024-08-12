@@ -44,6 +44,7 @@ export async function syncFileMounts(
 }
 
 export async function syncDatabases(
+  config: Config,
   projectPrefix: string,
   fromEnv: string,
   toEnv: string,
@@ -55,22 +56,25 @@ export async function syncDatabases(
 
   if ('' === appToSync) {
     if (databasesToSync.length > 0) {
-      for (const dbName of databasesToSync) {
-        dbQueries.push(`${projectPrefix}-${fromEnv}-${dbName}`)
-        dbQueries.push(`${projectPrefix}-${toEnv}-${dbName}`)
+      for (const schema of databasesToSync) {
+        dbQueries.push(`${projectPrefix}-${fromEnv}-${schema}`)
+        dbQueries.push(`${projectPrefix}-${toEnv}-${schema}`)
       }
     } else {
       dbQueries.push(`${projectPrefix}-${fromEnv}-*`)
       dbQueries.push(`${projectPrefix}-${toEnv}-*`)
     }
   } else if (null !== app) {
-    for (const dbName of Object.values(app.relationships).filter(
+    for (const relation of Object.values(app.relationships).filter(
       d =>
         'database' === d.split(':')[0] &&
         (databasesToSync.length === 0 || databasesToSync.includes(d.split(':')[1] ?? appToSync))
     )) {
-      dbQueries.push(`${projectPrefix}-${fromEnv}-${dbName}`)
-      dbQueries.push(`${projectPrefix}-${toEnv}-${dbName}`)
+      const endpoint = relation.split(':')[1] ?? appToSync
+      const [schema] = (config.databases?.endpoints[endpoint] ?? '').split(':')
+
+      dbQueries.push(`${projectPrefix}-${fromEnv}-${schema}`)
+      dbQueries.push(`${projectPrefix}-${toEnv}-${schema}`)
     }
   } else {
     throw new Error(`Cannot find "applications.${appToSync}" in the ".hosting/config.yaml" file.`)

@@ -52468,7 +52468,7 @@ async function run() {
         }
         if (shallSyncDatabases) {
             core.info(`Syncing databases from environment "${fromEnv}" to environment "${toEnv}"`);
-            await (0, services_1.syncDatabases)(projectPrefix, fromEnv, toEnv, app, appKey, databaseNames);
+            await (0, services_1.syncDatabases)(config, projectPrefix, fromEnv, toEnv, app, appKey, databaseNames);
         }
     }
     catch (error) {
@@ -52542,13 +52542,13 @@ async function syncFileMounts(config, projectPrefix, fromEnv, toEnv, appToSync =
         }
     }
 }
-async function syncDatabases(projectPrefix, fromEnv, toEnv, app, appToSync = '', databasesToSync = []) {
+async function syncDatabases(config, projectPrefix, fromEnv, toEnv, app, appToSync = '', databasesToSync = []) {
     const dbQueries = [];
     if ('' === appToSync) {
         if (databasesToSync.length > 0) {
-            for (const dbName of databasesToSync) {
-                dbQueries.push(`${projectPrefix}-${fromEnv}-${dbName}`);
-                dbQueries.push(`${projectPrefix}-${toEnv}-${dbName}`);
+            for (const schema of databasesToSync) {
+                dbQueries.push(`${projectPrefix}-${fromEnv}-${schema}`);
+                dbQueries.push(`${projectPrefix}-${toEnv}-${schema}`);
             }
         }
         else {
@@ -52557,10 +52557,12 @@ async function syncDatabases(projectPrefix, fromEnv, toEnv, app, appToSync = '',
         }
     }
     else if (null !== app) {
-        for (const dbName of Object.values(app.relationships).filter(d => 'database' === d.split(':')[0] &&
+        for (const relation of Object.values(app.relationships).filter(d => 'database' === d.split(':')[0] &&
             (databasesToSync.length === 0 || databasesToSync.includes(d.split(':')[1] ?? appToSync)))) {
-            dbQueries.push(`${projectPrefix}-${fromEnv}-${dbName}`);
-            dbQueries.push(`${projectPrefix}-${toEnv}-${dbName}`);
+            const endpoint = relation.split(':')[1] ?? appToSync;
+            const [schema] = (config.databases?.endpoints[endpoint] ?? '').split(':');
+            dbQueries.push(`${projectPrefix}-${fromEnv}-${schema}`);
+            dbQueries.push(`${projectPrefix}-${toEnv}-${schema}`);
         }
     }
     else {

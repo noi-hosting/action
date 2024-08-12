@@ -58,7 +58,7 @@ export async function run(): Promise<void> {
     if (shallSyncDatabases) {
       core.info(`Syncing databases from environment "${fromEnv}" to environment "${toEnv}"`)
 
-      await syncDatabases(projectPrefix, fromEnv, toEnv, app, appKey, databaseNames)
+      await syncDatabases(config, projectPrefix, fromEnv, toEnv, app, appKey, databaseNames)
     }
   } catch (error) {
     if (error instanceof Error) core.setFailed(error.message)
