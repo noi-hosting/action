@@ -66,9 +66,9 @@ export async function syncDatabases(
     }
   } else if (null !== app) {
     for (const relation of Object.values(app.relationships).filter(
-      d =>
-        'database' === d.split(':')[0] &&
-        (databasesToSync.length === 0 || databasesToSync.includes(d.split(':')[1] ?? appToSync))
+      r =>
+        'database' === r.split(':')[0] &&
+        (databasesToSync.length === 0 || databasesToSync.includes(r.split(':')[1] ?? appToSync))
     )) {
       const endpoint = relation.split(':')[1] ?? appToSync
       const [schema] = (config.databases?.endpoints[endpoint] ?? '').split(':')

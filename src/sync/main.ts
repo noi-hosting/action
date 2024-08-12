@@ -58,6 +58,10 @@ export async function run(): Promise<void> {
     if (shallSyncDatabases) {
       core.info(`Syncing databases from environment "${fromEnv}" to environment "${toEnv}"`)
 
+      if (databaseNames.length > 0) {
+        core.info(`Limiting to databases: ${JSON.stringify(databaseNames)}"`)
+      }
+
       await syncDatabases(config, projectPrefix, fromEnv, toEnv, app, appKey, databaseNames)
     }
   } catch (error) {

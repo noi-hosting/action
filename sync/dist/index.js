@@ -52468,6 +52468,9 @@ async function run() {
         }
         if (shallSyncDatabases) {
             core.info(`Syncing databases from environment "${fromEnv}" to environment "${toEnv}"`);
+            if (databaseNames.length > 0) {
+                core.info(`Limiting to databases: ${JSON.stringify(databaseNames)}"`);
+            }
             await (0, services_1.syncDatabases)(config, projectPrefix, fromEnv, toEnv, app, appKey, databaseNames);
         }
     }
@@ -52557,8 +52560,8 @@ async function syncDatabases(config, projectPrefix, fromEnv, toEnv, app, appToSy
         }
     }
     else if (null !== app) {
-        for (const relation of Object.values(app.relationships).filter(d => 'database' === d.split(':')[0] &&
-            (databasesToSync.length === 0 || databasesToSync.includes(d.split(':')[1] ?? appToSync)))) {
+        for (const relation of Object.values(app.relationships).filter(r => 'database' === r.split(':')[0] &&
+            (databasesToSync.length === 0 || databasesToSync.includes(r.split(':')[1] ?? appToSync)))) {
             const endpoint = relation.split(':')[1] ?? appToSync;
             const [schema] = (config.databases?.endpoints[endpoint] ?? '').split(':');
             if ('' === schema) {
