@@ -52537,6 +52537,7 @@ async function syncFileMounts(config, projectPrefix, fromEnv, toEnv, appToSync =
             dir = dir.trim().replace(/\/$/, '').replace(/^\//, '');
             const pathFrom = `/home/${fromWebspace.webspaceName}/html/current/${dir}`;
             const pathTo = `/home/${toWebspace.webspaceName}/html/current/${dir}`;
+            core.info(`Now syncing: ${pathFrom} to ${pathTo}`);
             await (0, exec_1.exec)(`/bin/bash -c "ssh -p 2244 -R localhost:50000:${toWebspace.hostName}:2244 ${fromWebspace.hostName} 'rsync -e \\'ssh -p 50000\\' -azr --delete ${pathFrom} localhost:${pathTo}'"`);
         }
     }
