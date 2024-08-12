@@ -25,7 +25,7 @@ export async function run(): Promise<void> {
 
     const shallSyncFiles: boolean = core.getBooleanInput('files')
     const shallSyncDatabases: boolean = core.getBooleanInput('databases')
-    const databaseNames: string[] = core.getInput('limit-database').split(' ')
+    const databaseNames: string[] = core.getInput('limit-database').split(' ').filter(Boolean)
 
     const { config, app } = await readConfig(appKey)
 
@@ -59,7 +59,7 @@ export async function run(): Promise<void> {
       core.info(`Syncing databases from environment "${fromEnv}" to environment "${toEnv}"`)
 
       if (databaseNames.length > 0) {
-        core.info(`Limiting to databases: ${JSON.stringify(databaseNames)}"`)
+        core.info(`Limiting to databases: ${JSON.stringify(databaseNames)}`)
       }
 
       await syncDatabases(config, projectPrefix, fromEnv, toEnv, app, appKey, databaseNames)
