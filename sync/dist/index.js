@@ -52425,11 +52425,9 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = run;
 const core = __importStar(__nccwpck_require__(9093));
 const github = __importStar(__nccwpck_require__(5942));
-const exec_1 = __nccwpck_require__(7775);
-const client = __importStar(__nccwpck_require__(1033));
 const config_1 = __nccwpck_require__(9598);
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
-const api_client_1 = __nccwpck_require__(1033);
+const services_1 = __nccwpck_require__(9494);
 /**
  * The main function for the action.
  * @returns {Promise<void>} Resolves when the action is complete.
@@ -52445,9 +52443,9 @@ async function run() {
         if ('' === projectPrefix) {
             projectPrefix = uniqHandle;
         }
-        const shallSyncFiles = 'false' !== core.getInput('files');
-        const shallSyncDatabases = 'false' !== core.getInput('databases');
-        const syncDatabases = core.getInput('only-databases').split(' ');
+        const shallSyncFiles = core.getBooleanInput('files');
+        const shallSyncDatabases = core.getBooleanInput('databases');
+        const databaseNames = core.getInput('only-databases').split(' ');
         const { config, app } = await (0, config_1.readConfig)(appKey);
         let fromEnv = core.getInput('from', {
             required: false
@@ -52461,107 +52459,158 @@ async function run() {
         if ('' === fromEnv || '' === toEnv) {
             core.info('Sync destinations were not specified and cannot be derived. Please check the `project.parent` config in the ".hosting/config.yaml" file.');
         }
+        if (fromEnv === toEnv) {
+            return;
+        }
         if (shallSyncFiles) {
-            for (const [appName, app1] of Object.entries(config.applications)) {
-                if ('' !== appKey && appName !== appKey) {
-                    continue;
-                }
-                const fromWebspace = await client.findOneWebspaceByName(`${projectPrefix}-${fromEnv}-${appName}`);
-                const toWebspace = await client.findOneWebspaceByName(`${projectPrefix}-${toEnv}-${appName}`);
-                if (null === fromWebspace) {
-                    core.info(`The webspace for app ${appName} is not present in the ${fromEnv} environment. Skipping.`);
-                    continue;
-                }
-                if (null === toWebspace) {
-                    continue;
-                }
-                const dirs = Object.values(app1.sync);
-                for (let dir of dirs) {
-                    dir = dir.trim().replace(/\/$/, '').replace(/^\//, '');
-                    const pathFrom = `/home/${fromWebspace.webspaceName}/html/current/${dir}`;
-                    const pathTo = `/home/${toWebspace.webspaceName}/html/current/${dir}`;
-                    await (0, exec_1.exec)(`/bin/bash -c "ssh -p 2244 -R localhost:50000:${toWebspace.hostName}:2244 ${fromWebspace.hostName} 'rsync -e "ssh -p 50000" -azr --delete ${pathFrom} localhost:${pathTo}'"`);
-                }
-            }
+            core.info(`Syncing file mounts from environment "${fromEnv}" to environment "${toEnv}"`);
+            await (0, services_1.syncFileMounts)(config, projectPrefix, fromEnv, toEnv, appKey);
         }
-        if (!shallSyncDatabases) {
-            return;
+        if (shallSyncDatabases) {
+            core.info(`Syncing databases from environment "${fromEnv}" to environment "${toEnv}"`);
+            await (0, services_1.syncDatabases)(projectPrefix, fromEnv, toEnv, app, appKey, databaseNames);
         }
-        core.info(`Syncing databases from environment "${fromEnv}" to environment "${toEnv}"`);
-        const dbQueries = [];
-        if ('' === appKey) {
-            if (syncDatabases.length > 0) {
-                for (const dbName of syncDatabases) {
-                    dbQueries.push(`${projectPrefix}-${fromEnv}-${dbName}`);
-                    dbQueries.push(`${projectPrefix}-${toEnv}-${dbName}`);
-                }
-            }
-            else {
-                dbQueries.push(`${projectPrefix}-${fromEnv}-*`);
-                dbQueries.push(`${projectPrefix}-${toEnv}-*`);
-            }
-        }
-        else if (null !== app) {
-            for (const dbName of Object.values(app.relationships).filter(d => 'database' === d.split(':')[0] &&
-                (syncDatabases.length === 0 || syncDatabases.includes(d.split(':')[1] ?? appKey)))) {
-                dbQueries.push(`${projectPrefix}-${fromEnv}-${dbName}`);
-                dbQueries.push(`${projectPrefix}-${toEnv}-${dbName}`);
-            }
-        }
-        else {
-            throw new Error(`Cannot find "applications.${appKey}" in the ".hosting/config.yaml" file.`);
-        }
-        if (!dbQueries.length) {
-            return;
-        }
-        const migrations = {};
-        const dbUsername = `gh${crypto_1.default.randomInt(1000000, 9999999)}`;
-        const { user: dbUser, password: dbPassword } = await client.createDatabaseUser(dbUsername);
-        core.setSecret(dbPassword);
-        const foundDatabases = await (0, api_client_1.findDatabases)(dbQueries);
-        for (const db of foundDatabases) {
-            const { dbLogin } = await client.addDatabaseAccess(db, dbUser);
-            const dbHost = db.hostName;
-            const dbEnv = db.name.split('-')[1] ?? null;
-            const dbName = db.name.split('-')[2] ?? null;
-            let k;
-            if (dbEnv === fromEnv) {
-                k = 'from';
-            }
-            else if (dbEnv === toEnv) {
-                k = 'to';
-            }
-            else {
-                throw new Error(`Unexpected database environment "${dbEnv}"`);
-            }
-            migrations[dbName] = migrations[dbName] || {};
-            migrations[dbName][k] = {
-                host: dbHost,
-                user: dbLogin,
-                password: dbPassword,
-                name: db.dbName,
-                humanName: db.name
-            };
-        }
-        for (const migration of Object.values(migrations)) {
-            if (!('from' in migration)) {
-                core.info(`Found database "${migration.to.humanName}" but this database is not present in the "${fromEnv}" environment`);
-                continue;
-            }
-            else if (!('to' in migration)) {
-                continue;
-            }
-            core.info(`Database "${migration.to.humanName}" will be overridden using database "${migration.from.humanName}"`);
-            const filename = `${crypto_1.default.randomUUID()}.sql`;
-            await (0, exec_1.exec)(`/bin/bash -c "mysqldump -h ${migration.from.host} -u ${migration.from.user} -p${migration.from.password} ${migration.from.name} > ${filename}"`);
-            await (0, exec_1.exec)(`/bin/bash -c "mysql -h ${migration.to.host} -u ${migration.to.user} -p${migration.to.password} ${migration.to.name} < ${filename}"`);
-        }
-        await client.deleteDatabaseUserById(dbUser.id);
     }
     catch (error) {
         if (error instanceof Error)
             core.setFailed(error.message);
     }
+}
+
+
+/***/ }),
+
+/***/ 9494:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.syncFileMounts = syncFileMounts;
+exports.syncDatabases = syncDatabases;
+const client = __importStar(__nccwpck_require__(1033));
+const core = __importStar(__nccwpck_require__(9093));
+const exec_1 = __nccwpck_require__(7775);
+const crypto_1 = __importDefault(__nccwpck_require__(6113));
+const api_client_1 = __nccwpck_require__(1033);
+async function syncFileMounts(config, projectPrefix, fromEnv, toEnv, appToSync = '') {
+    for (const [appName, app] of Object.entries(config.applications)) {
+        if ('' !== appToSync && appName !== appToSync) {
+            continue;
+        }
+        const fromWebspace = await client.findOneWebspaceByName(`${projectPrefix}-${fromEnv}-${appName}`);
+        const toWebspace = await client.findOneWebspaceByName(`${projectPrefix}-${toEnv}-${appName}`);
+        if (null === fromWebspace) {
+            core.info(`The webspace for app ${appName} is not present in the ${fromEnv} environment. Skipping.`);
+            continue;
+        }
+        if (null === toWebspace || fromWebspace.id === toWebspace.id) {
+            continue;
+        }
+        for (let dir of Object.values(app.sync)) {
+            dir = dir.trim().replace(/\/$/, '').replace(/^\//, '');
+            const pathFrom = `/home/${fromWebspace.webspaceName}/html/current/${dir}`;
+            const pathTo = `/home/${toWebspace.webspaceName}/html/current/${dir}`;
+            await (0, exec_1.exec)(`/bin/bash -c "ssh -p 2244 -R localhost:50000:${toWebspace.hostName}:2244 ${fromWebspace.hostName} 'rsync -e \\'ssh -p 50000\\' -azr --delete ${pathFrom} localhost:${pathTo}'"`);
+        }
+    }
+}
+async function syncDatabases(projectPrefix, fromEnv, toEnv, app, appToSync = '', databasesToSync = []) {
+    const dbQueries = [];
+    if ('' === appToSync) {
+        if (databasesToSync.length > 0) {
+            for (const dbName of databasesToSync) {
+                dbQueries.push(`${projectPrefix}-${fromEnv}-${dbName}`);
+                dbQueries.push(`${projectPrefix}-${toEnv}-${dbName}`);
+            }
+        }
+        else {
+            dbQueries.push(`${projectPrefix}-${fromEnv}-*`);
+            dbQueries.push(`${projectPrefix}-${toEnv}-*`);
+        }
+    }
+    else if (null !== app) {
+        for (const dbName of Object.values(app.relationships).filter(d => 'database' === d.split(':')[0] &&
+            (databasesToSync.length === 0 || databasesToSync.includes(d.split(':')[1] ?? appToSync)))) {
+            dbQueries.push(`${projectPrefix}-${fromEnv}-${dbName}`);
+            dbQueries.push(`${projectPrefix}-${toEnv}-${dbName}`);
+        }
+    }
+    else {
+        throw new Error(`Cannot find "applications.${appToSync}" in the ".hosting/config.yaml" file.`);
+    }
+    if (!dbQueries.length) {
+        return;
+    }
+    const migrations = {};
+    const dbUsername = `gh${crypto_1.default.randomInt(1000000, 9999999)}`;
+    const { user: dbUser, password: dbPassword } = await client.createDatabaseUser(dbUsername);
+    core.setSecret(dbPassword);
+    const foundDatabases = await (0, api_client_1.findDatabases)(dbQueries);
+    for (const db of foundDatabases) {
+        const { dbLogin } = await client.addDatabaseAccess(db, dbUser);
+        const dbHost = db.hostName;
+        const dbEnv = db.name.split('-')[1] ?? null;
+        const dbName = db.name.split('-')[2] ?? null;
+        let k;
+        if (dbEnv === fromEnv) {
+            k = 'from';
+        }
+        else if (dbEnv === toEnv) {
+            k = 'to';
+        }
+        else {
+            throw new Error(`Unexpected database environment "${dbEnv}"`);
+        }
+        migrations[dbName] = migrations[dbName] || {};
+        migrations[dbName][k] = {
+            host: dbHost,
+            user: dbLogin,
+            password: dbPassword,
+            name: db.dbName,
+            humanName: db.name
+        };
+    }
+    for (const migration of Object.values(migrations)) {
+        if (!('from' in migration)) {
+            core.info(`Found database "${migration.to.humanName}" but this database is not present in the "${fromEnv}" environment`);
+            continue;
+        }
+        else if (!('to' in migration)) {
+            continue;
+        }
+        core.info(`Database "${migration.to.humanName}" will be overridden using database "${migration.from.humanName}"`);
+        const filename = `${crypto_1.default.randomUUID()}.sql`;
+        await (0, exec_1.exec)(`/bin/bash -c "mysqldump -h ${migration.from.host} -u ${migration.from.user} -p${migration.from.password} ${migration.from.name} > ${filename}"`);
+        await (0, exec_1.exec)(`/bin/bash -c "mysql -h ${migration.to.host} -u ${migration.to.user} -p${migration.to.password} ${migration.to.name} < ${filename}"`);
+    }
+    await client.deleteDatabaseUserById(dbUser.id);
 }
 
 
