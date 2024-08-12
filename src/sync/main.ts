@@ -25,7 +25,7 @@ export async function run(): Promise<void> {
 
     const shallSyncFiles: boolean = core.getBooleanInput('files')
     const shallSyncDatabases: boolean = core.getBooleanInput('databases')
-    const databaseNames: string[] = core.getInput('only-databases').split(' ')
+    const databaseNames: string[] = core.getInput('limit-database').split(' ')
 
     const { config, app } = await readConfig(appKey)
 

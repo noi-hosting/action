@@ -52445,7 +52445,7 @@ async function run() {
         }
         const shallSyncFiles = core.getBooleanInput('files');
         const shallSyncDatabases = core.getBooleanInput('databases');
-        const databaseNames = core.getInput('only-databases').split(' ');
+        const databaseNames = core.getInput('limit-database').split(' ');
         const { config, app } = await (0, config_1.readConfig)(appKey);
         let fromEnv = core.getInput('from', {
             required: false

@@ -20,7 +20,7 @@ inputs:
   databases:
     description: You can disable sync of databases.
     default: 'true'
-  only-databases:
+  limit-database:
     description: You can limit sync of databases to given.
     default: ''
   project-prefix:
