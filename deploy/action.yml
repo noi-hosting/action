@@ -103,7 +103,7 @@ runs:
         to: ${{ github.ref_name }}
         files: ${{ steps.hosting.outputs.sync-files }}
         databases: ${{ steps.hosting.outputs.sync-databases && 'true' || 'false' }}
-        only-databases: ${{ steps.hosting.outputs.sync-databases }}
+        limit-database: ${{ steps.hosting.outputs.sync-databases }}
 
     # We need jq for json processing
     - name: Install jq
