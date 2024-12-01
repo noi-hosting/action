@@ -51478,7 +51478,7 @@ async function findOrCreateWebspace(webspaceName, app, users, pool) {
     };
 }
 async function configureVhosts(web, app, ref, config, appKey, foundVhosts, webspace, phpVersion) {
-    const actualDomainName = translateDomainName(web.domainName ?? '{default}', ref, config, appKey);
+    const actualDomainName = translateDomainName(web.domainName ?? '{default}', ref, config, appKey, web.defaultDomainName ?? '');
     let vhost = foundVhosts.find(v => v.domainName === actualDomainName) ?? null;
     if (null === vhost) {
         core.info(`Configuring ${actualDomainName}...`);
@@ -51493,7 +51493,7 @@ async function configureVhosts(web, app, ref, config, appKey, foundVhosts, websp
     };
 }
 async function pruneVhosts(foundVhosts, app, ref, config, appKey) {
-    const allowedDomainNames = app.web.map(web => translateDomainName(web.domainName ?? '{default}', ref, config, appKey));
+    const allowedDomainNames = app.web.map(web => translateDomainName(web.domainName ?? '{default}', ref, config, appKey, web.defaultDomainName ?? ''));
     for (const relict of foundVhosts.filter(v => !allowedDomainNames.includes(v.domainName))) {
         core.info(`Deleting ${relict.domainName}...`);
         await client.deleteVhostById(relict.id);
@@ -51611,8 +51611,10 @@ async function pruneBranches(projectPrefix) {
         }
     }
 }
-function translateDomainName(domainName, environment, config, app) {
-    let defaultDomainName = core.getInput('default-domain-name');
+function translateDomainName(domainName, environment, config, app, defaultDomainName = '') {
+    if ('' === defaultDomainName) {
+        defaultDomainName = core.getInput('default-domain-name');
+    }
     const previewDomain = config.project.domain ?? null;
     if ('' === defaultDomainName && null !== previewDomain) {
         defaultDomainName = previewDomain;

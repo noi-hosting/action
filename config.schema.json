@@ -109,6 +109,11 @@
                   "default": "{default}",
                   "pattern": "^([a-z0-9.\\-]|\\{default\\}|\\{app\\}|\\{ref\\})+$"
                 },
+                "defaultDomainName": {
+                  "type": "string",
+                  "default": "",
+                  "pattern": "^([a-z0-9.\\-])+$"
+                },
                 "www": {
                   "type": "boolean",
                   "default": true

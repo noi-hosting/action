@@ -258,7 +258,13 @@ export async function configureVhosts(
 ): Promise<{
   domainName: string
 }> {
-  const actualDomainName = translateDomainName(web.domainName ?? '{default}', ref, config, appKey)
+  const actualDomainName = translateDomainName(
+    web.domainName ?? '{default}',
+    ref,
+    config,
+    appKey,
+    web.defaultDomainName ?? ''
+  )
 
   let vhost = foundVhosts.find(v => v.domainName === actualDomainName) ?? null
   if (null === vhost) {
@@ -281,7 +287,9 @@ export async function pruneVhosts(
   config: Config,
   appKey: string
 ): Promise<void> {
-  const allowedDomainNames = app.web.map(web => translateDomainName(web.domainName ?? '{default}', ref, config, appKey))
+  const allowedDomainNames = app.web.map(web =>
+    translateDomainName(web.domainName ?? '{default}', ref, config, appKey, web.defaultDomainName ?? '')
+  )
   for (const relict of foundVhosts.filter(v => !allowedDomainNames.includes(v.domainName))) {
     core.info(`Deleting ${relict.domainName}...`)
 
@@ -458,8 +466,17 @@ export async function pruneBranches(projectPrefix: string): Promise<void> {
   }
 }
 
-function translateDomainName(domainName: string, environment: string, config: Config, app: string): string {
-  let defaultDomainName = core.getInput('default-domain-name')
+function translateDomainName(
+  domainName: string,
+  environment: string,
+  config: Config,
+  app: string,
+  defaultDomainName = ''
+): string {
+  if ('' === defaultDomainName) {
+    defaultDomainName = core.getInput('default-domain-name')
+  }
+
   const previewDomain = config.project.domain ?? null
   if ('' === defaultDomainName && null !== previewDomain) {
     defaultDomainName = previewDomain

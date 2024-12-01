@@ -92,18 +92,18 @@ runs:
         access-role-ssh: ${{ inputs.access-role-ssh }}
         keep-branches: ${{steps.branch-names.outputs.result}}
 
-#    # Sync app
-#    - name: Sync environments
-#      if: ${{ steps.hosting.outputs.sync-files || steps.hosting.outputs.sync-databases }}
-#      uses: noi-hosting/action/sync@main
-#      with:
-#        auth-token: ${{ inputs.auth-token }}
-#        project-prefix: ${{ inputs.project-prefix }}
-#        ssh-private-key: ${{ inputs.ssh-private-key }}
-#        to: ${{ github.ref_name }}
-#        files: ${{ steps.hosting.outputs.sync-files }}
-#        databases: ${{ steps.hosting.outputs.sync-databases && 'true' || 'false' }}
-#        limit-database: ${{ steps.hosting.outputs.sync-databases }}
+    #    # Sync app
+    #    - name: Sync environments
+    #      if: ${{ steps.hosting.outputs.sync-files || steps.hosting.outputs.sync-databases }}
+    #      uses: noi-hosting/action/sync@main
+    #      with:
+    #        auth-token: ${{ inputs.auth-token }}
+    #        project-prefix: ${{ inputs.project-prefix }}
+    #        ssh-private-key: ${{ inputs.ssh-private-key }}
+    #        to: ${{ github.ref_name }}
+    #        files: ${{ steps.hosting.outputs.sync-files }}
+    #        databases: ${{ steps.hosting.outputs.sync-databases && 'true' || 'false' }}
+    #        limit-database: ${{ steps.hosting.outputs.sync-databases }}
 
     # We need jq for json processing
     - name: Install jq
