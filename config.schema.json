@@ -109,7 +109,7 @@
                   "default": "{default}",
                   "pattern": "^([a-z0-9.\\-]|\\{default\\}|\\{app\\}|\\{ref\\})+$"
                 },
-                "defaultDomainName": {
+                "parentDomainName": {
                   "type": "string",
                   "default": "",
                   "pattern": "^([a-z0-9.\\-])+$"

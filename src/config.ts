@@ -95,7 +95,7 @@ interface AppConfig {
 interface WebConfig {
   root?: string
   domainName?: string
-  defaultDomainName?: string
+  parentDomainName?: string
   www?: boolean
   locations: {
     [matchString: string]: {
