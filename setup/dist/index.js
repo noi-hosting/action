@@ -51617,6 +51617,7 @@ function translateDomainName(domainName, environment, config, app, parentDomainN
     if ('' === defaultDomainName && '' !== parentDomainName) {
         defaultDomainName = parentDomainName;
         if (environment !== config.project.parent) {
+            defaultDomainName.replace(/^www\./, '');
             defaultDomainName = `{ref}.${defaultDomainName}`;
         }
     }
