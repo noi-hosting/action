@@ -481,7 +481,7 @@ function translateDomainName(
 
     if (environment !== config.project.parent) {
       defaultDomainName = defaultDomainName.replace(/^www\./, '')
-      defaultDomainName = `{ref}.${defaultDomainName}`
+      defaultDomainName = `dev-{ref}.${defaultDomainName}`
     }
   }
 
