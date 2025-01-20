@@ -51530,7 +51530,7 @@ async function configureDatabases(config, app, databasePrefix, appKey, foundData
             const { user: dbUser, password: databasePassword } = await client.createDatabaseUser(`${dbUserName}.v${++rotation}`, app.account);
             const { database, dbLogin } = await client.addDatabaseAccess(existingDatabase, dbUser, privileges ?? '');
             // Delete old db users
-            for (const u of usersWithAccess.slice(1)) {
+            for (const u of usersWithAccess.slice(2)) {
                 await client.deleteDatabaseUserById(u.id);
             }
             defineEnv(envVars, relationName, database, dbLogin, databasePassword);

@@ -350,7 +350,7 @@ export async function configureDatabases(
       const { database, dbLogin } = await client.addDatabaseAccess(existingDatabase, dbUser, privileges ?? '')
 
       // Delete old db users
-      for (const u of usersWithAccess.slice(1)) {
+      for (const u of usersWithAccess.slice(2)) {
         await client.deleteDatabaseUserById(u.id)
       }
 
