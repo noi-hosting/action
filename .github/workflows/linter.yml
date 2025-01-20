@@ -25,6 +25,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9.12.3
+
       - name: Setup Node.js
         id: setup-node
         uses: actions/setup-node@v4
@@ -34,7 +38,7 @@ jobs:
 
       - name: Install Dependencies
         id: install
-        run: pnpm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Lint Codebase
         id: super-linter
