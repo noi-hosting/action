@@ -198,7 +198,7 @@ export async function findOrCreateWebspace(
     } else {
       core.info(`Updating webspace ${webspaceName} (${webspace.id})`)
 
-      webspace = await client.updateWebspace(webspace, webspaceUsers, app.php.version, app.cron, redisEnabled)
+      //webspace = await client.updateWebspace(webspace, webspaceUsers, app.php.version, app.cron, redisEnabled)
     }
 
     const webspaceAccess = webspace.accesses.find(a => ghUser?.id === a.userId) ?? null
