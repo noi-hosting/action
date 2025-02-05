@@ -51445,7 +51445,7 @@ async function findOrCreateWebspace(webspaceName, app, users, pool) {
         }
         else {
             core.info(`Updating webspace ${webspaceName} (${webspace.id})`);
-            //webspace = await client.updateWebspace(webspace, webspaceUsers, app.php.version, app.cron, redisEnabled)
+            webspace = await client.updateWebspace(webspace, webspaceUsers, app.php.version, app.cron, redisEnabled);
         }
         const webspaceAccess = webspace.accesses.find(a => ghUser?.id === a.userId) ?? null;
         if (null === webspaceAccess) {
