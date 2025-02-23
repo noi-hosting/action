@@ -436,6 +436,7 @@ export async function createVhost(
 }
 export async function updateVhost(
   id: string,
+  webspace: WebspaceResult,
   web: WebConfig,
   app: AppConfig,
   domainName: string,
@@ -449,6 +450,7 @@ export async function updateVhost(
         id,
         domainName,
         serverType: 'nginx',
+        webspaceId: webspace.id,
         enableAlias: web.www ?? true,
         redirectToPrimaryName: true,
         redirectHttpToHttps: true,

@@ -50893,13 +50893,14 @@ async function createVhost(webspace, web, app, domainName, phpVersion) {
     }
     return response.result.response;
 }
-async function updateVhost(id, web, app, domainName, phpVersion) {
+async function updateVhost(id, webspace, web, app, domainName, phpVersion) {
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/vhostUpdate`, {
         authToken: token,
         vhost: {
             id,
             domainName,
             serverType: 'nginx',
+            webspaceId: webspace.id,
             enableAlias: web.www ?? true,
             redirectToPrimaryName: true,
             redirectHttpToHttps: true,
@@ -51525,7 +51526,7 @@ async function configureVhosts(web, app, ref, config, appKey, foundVhosts, websp
     }
     else if (mustBeUpdated(vhost, app, web)) {
         core.info(`Configuring ${actualDomainName}...`);
-        vhost = await client.updateVhost(vhost.id, web, app, actualDomainName, phpVersion);
+        vhost = await client.updateVhost(vhost.id, webspace, web, app, actualDomainName, phpVersion);
     }
     return {
         domainName: actualDomainName

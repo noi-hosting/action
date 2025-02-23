@@ -52124,13 +52124,14 @@ async function createVhost(webspace, web, app, domainName, phpVersion) {
     }
     return response.result.response;
 }
-async function updateVhost(id, web, app, domainName, phpVersion) {
+async function updateVhost(id, webspace, web, app, domainName, phpVersion) {
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/vhostUpdate`, {
         authToken: token,
         vhost: {
             id,
             domainName,
             serverType: 'nginx',
+            webspaceId: webspace.id,
             enableAlias: web.www ?? true,
             redirectToPrimaryName: true,
             redirectHttpToHttps: true,
