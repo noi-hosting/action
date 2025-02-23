@@ -51796,6 +51796,7 @@ exports.createWebspace = createWebspace;
 exports.updateWebspace = updateWebspace;
 exports.updateDatabase = updateDatabase;
 exports.createVhost = createVhost;
+exports.updateVhost = updateVhost;
 exports.createDatabase = createDatabase;
 exports.addDatabaseAccess = addDatabaseAccess;
 exports.createWebspaceUser = createWebspaceUser;
@@ -52092,6 +52093,44 @@ async function createVhost(webspace, web, app, domainName, phpVersion) {
             domainName,
             serverType: 'nginx',
             webspaceId: webspace.id,
+            enableAlias: web.www ?? true,
+            redirectToPrimaryName: true,
+            redirectHttpToHttps: true,
+            phpVersion,
+            webRoot: `current/${web.root ?? ''}`.replace(/\/$/, ''),
+            locations: Object.entries(web.locations).map(function ([matchString, location]) {
+                return {
+                    matchString,
+                    matchType: matchString.startsWith('^') ? 'regex' : matchString.startsWith('/') ? 'directory' : 'default',
+                    locationType: (location.allow ?? true) ? 'generic' : 'blockAccess',
+                    mapScript: typeof (location.passthru ?? false) === 'string' ? location.passthru : '',
+                    phpEnabled: false !== (location.passthru ?? false)
+                };
+            }),
+            sslSettings: {
+                profile: 'modern',
+                managedSslProductCode: 'ssl-letsencrypt-dv-3m'
+            }
+        },
+        phpIni: {
+            values: transformPhpIni(app.php.ini, app.php.extensions)
+        }
+    });
+    if (null === response.result) {
+        throw new Error('Unexpected error');
+    }
+    if ('error' === (response.result.status ?? null)) {
+        throw new Error(JSON.stringify(response.result.errors ?? []));
+    }
+    return response.result.response;
+}
+async function updateVhost(id, web, app, domainName, phpVersion) {
+    const response = await _http.postJson(`${baseUri}/webhosting/v1/json/vhostUpdate`, {
+        authToken: token,
+        vhost: {
+            id,
+            domainName,
+            serverType: 'nginx',
             enableAlias: web.www ?? true,
             redirectToPrimaryName: true,
             redirectHttpToHttps: true,

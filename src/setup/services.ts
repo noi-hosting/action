@@ -272,7 +272,7 @@ export async function configureVhosts(
     vhost = await client.createVhost(webspace, web, app, actualDomainName, phpVersion)
   } else if (mustBeUpdated(vhost, app, web)) {
     core.info(`Configuring ${actualDomainName}...`)
-    // todo
+    vhost = await client.updateVhost(vhost.id, web, app, actualDomainName, phpVersion)
   }
 
   return {
