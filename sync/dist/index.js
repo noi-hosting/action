@@ -51967,7 +51967,7 @@ async function findDatabaseById(databaseId) {
     return response.result?.response?.data[0] ?? null;
 }
 async function findPhpIniByVhostId(vhostId) {
-    const response = await _http.postJson(`${baseUri}/database/v1/json/vhostPhpIniList`, {
+    const response = await _http.postJson(`${baseUri}/webhosting/v1/json/vhostPhpIniList`, {
         authToken: token,
         vhostId
     });

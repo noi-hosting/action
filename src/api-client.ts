@@ -206,7 +206,7 @@ export async function findDatabaseById(databaseId: string): Promise<DatabaseResu
 
 export async function findPhpIniByVhostId(vhostId: string): Promise<PhpIniResult | null> {
   const response: TypedResponse<ApiActionResponse<PhpIniResult>> = await _http.postJson(
-    `${baseUri}/database/v1/json/vhostPhpIniList`,
+    `${baseUri}/webhosting/v1/json/vhostPhpIniList`,
     {
       authToken: token,
       vhostId
