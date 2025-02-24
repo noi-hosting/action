@@ -50903,13 +50903,7 @@ async function createVhost(webspace, web, app, domainName, phpVersion) {
     return response.result.response;
 }
 async function updateVhost(vhost, webspace, web, app, domainName, phpVersion, phpIni) {
-    console.log(phpIni);
     phpIni.push(...Object.values(transformPhpIni(app.php.ini, app.php.extensions)));
-    console.log(phpIni);
-    console.log((0, lodash_1.default)(phpIni)
-        .groupBy('key')
-        .map(lodash_1.default.spread(lodash_1.default.assign.bind(lodash_1.default)))
-        .value());
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/vhostUpdate`, {
         authToken: token,
         vhost: {
@@ -51545,7 +51539,6 @@ async function configureVhosts(web, app, ref, config, appKey, foundVhosts, websp
         return { domainName: actualDomainName };
     }
     const phpIni = await client.findPhpIniByVhostId(vhost.id);
-    console.log(phpIni);
     if (mustBeUpdated(vhost, app, web)) {
         core.info(`Configuring ${actualDomainName}...`);
         await client.updateVhost(vhost, webspace, web, app, actualDomainName, phpVersion, phpIni?.values ?? []);

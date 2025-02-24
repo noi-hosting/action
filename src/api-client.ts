@@ -456,16 +456,7 @@ export async function updateVhost(
   phpVersion: string,
   phpIni: PhpIniValueResult[]
 ): Promise<VhostResult> {
-  console.log(phpIni)
   phpIni.push(...Object.values(transformPhpIni(app.php.ini, app.php.extensions)))
-
-  console.log(phpIni)
-  console.log(
-    _(phpIni)
-      .groupBy('key')
-      .map(_.spread(_.assign.bind(_)))
-      .value()
-  )
 
   const response: TypedResponse<ApiActionResponse<VhostResult>> = await _http.postJson(
     `${baseUri}/webhosting/v1/json/vhostUpdate`,
