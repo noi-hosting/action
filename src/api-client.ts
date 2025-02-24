@@ -457,10 +457,6 @@ export async function updateVhost(
   phpIni: PhpIniValueResult[]
 ): Promise<VhostResult> {
   phpIni.push(...Object.values(transformPhpIni(app.php.ini, app.php.extensions)))
-  const values = _(phpIni)
-    .groupBy('id')
-    .map(_.spread(_.assign.bind(_)))
-    .value()
 
   const response: TypedResponse<ApiActionResponse<VhostResult>> = await _http.postJson(
     `${baseUri}/webhosting/v1/json/vhostUpdate`,
@@ -491,7 +487,10 @@ export async function updateVhost(
         }
       },
       phpIni: {
-        values
+        values: _(phpIni)
+          .groupBy('id')
+          .map(_.spread(_.assign.bind(_)))
+          .value()
       }
     }
   )
