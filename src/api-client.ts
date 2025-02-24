@@ -456,12 +456,13 @@ export async function updateVhost(
   phpVersion: string,
   phpIni: PhpIniValueResult[]
 ): Promise<VhostResult> {
+  console.log(phpIni)
   phpIni.push(...Object.values(transformPhpIni(app.php.ini, app.php.extensions)))
 
   console.log(phpIni)
   console.log(
     _(phpIni)
-      .groupBy('id')
+      .groupBy('key')
       .map(_.spread(_.assign.bind(_)))
       .value()
   )
@@ -496,7 +497,7 @@ export async function updateVhost(
       },
       phpIni: {
         values: _(phpIni)
-          .groupBy('id')
+          .groupBy('key')
           .map(_.spread(_.assign.bind(_)))
           .value()
       }

@@ -276,6 +276,7 @@ export async function configureVhosts(
   }
 
   const phpIni = await client.findPhpIniByVhostId(vhost.id)
+  console.log(phpIni)
 
   if (mustBeUpdated(vhost, app, web)) {
     core.info(`Configuring ${actualDomainName}...`)
