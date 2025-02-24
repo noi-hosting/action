@@ -50904,6 +50904,11 @@ async function createVhost(webspace, web, app, domainName, phpVersion) {
 }
 async function updateVhost(vhost, webspace, web, app, domainName, phpVersion, phpIni) {
     phpIni.push(...Object.values(transformPhpIni(app.php.ini, app.php.extensions)));
+    console.log(phpIni);
+    console.log((0, lodash_1.default)(phpIni)
+        .groupBy('id')
+        .map(lodash_1.default.spread(lodash_1.default.assign.bind(lodash_1.default)))
+        .value());
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/vhostUpdate`, {
         authToken: token,
         vhost: {
