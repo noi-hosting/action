@@ -1,5 +1,6 @@
 import * as core from '@actions/core'
 import crypto from 'crypto'
+import _ from 'lodash'
 import { HttpClient } from '@actions/http-client'
 import { TypedResponse } from '@actions/http-client/lib/interfaces'
 import { CronjobConfig, AppConfig, WebConfig } from './config'
@@ -201,6 +202,18 @@ export async function findDatabaseById(databaseId: string): Promise<DatabaseResu
   )
 
   return response.result?.response?.data[0] ?? null
+}
+
+export async function findPhpIniByVhostId(vhostId: string): Promise<PhpIniResult | null> {
+  const response: TypedResponse<ApiActionResponse<PhpIniResult>> = await _http.postJson(
+    `${baseUri}/database/v1/json/vhostPhpIniList`,
+    {
+      authToken: token,
+      vhostId
+    }
+  )
+
+  return response.result?.response ?? null
 }
 
 export async function findDatabaseAccesses(userName: string, databaseId: string): Promise<DatabaseUserResult[]> {
@@ -435,19 +448,26 @@ export async function createVhost(
   return response.result.response
 }
 export async function updateVhost(
-  id: string,
+  vhost: VhostResult,
   webspace: WebspaceResult,
   web: WebConfig,
   app: AppConfig,
   domainName: string,
-  phpVersion: string
+  phpVersion: string,
+  phpIni: PhpIniValueResult[]
 ): Promise<VhostResult> {
+  phpIni.push(...Object.values(transformPhpIni(app.php.ini, app.php.extensions)))
+  const values = _(phpIni)
+    .groupBy('id')
+    .map(_.spread(_.assign.bind(_)))
+    .value()
+
   const response: TypedResponse<ApiActionResponse<VhostResult>> = await _http.postJson(
     `${baseUri}/webhosting/v1/json/vhostUpdate`,
     {
       authToken: token,
       vhost: {
-        id,
+        id: vhost.id,
         domainName,
         serverType: 'nginx',
         webspaceId: webspace.id,
@@ -471,7 +491,7 @@ export async function updateVhost(
         }
       },
       phpIni: {
-        values: transformPhpIni(app.php.ini, app.php.extensions)
+        values
       }
     }
   )
@@ -883,6 +903,16 @@ interface DatabaseResult {
   forceSsl: boolean
   restrictions: string[]
   limitations: string[]
+}
+
+interface PhpIniResult {
+  values: PhpIniValueResult[]
+  vhostId: string
+}
+
+interface PhpIniValueResult {
+  key: string
+  value: string
 }
 
 export { VhostResult, WebspaceAccess, WebspaceResult, DatabaseResult, UserResult }

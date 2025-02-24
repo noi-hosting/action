@@ -51789,6 +51789,7 @@ exports.deleteDatabaseUserById = deleteDatabaseUserById;
 exports.deleteWebspaceUserById = deleteWebspaceUserById;
 exports.findDatabases = findDatabases;
 exports.findDatabaseById = findDatabaseById;
+exports.findPhpIniByVhostId = findPhpIniByVhostId;
 exports.findDatabaseAccesses = findDatabaseAccesses;
 exports.findUsersByName = findUsersByName;
 exports.findDatabaseUsersByName = findDatabaseUsersByName;
@@ -51804,6 +51805,7 @@ exports.createDatabaseUser = createDatabaseUser;
 exports.transformCronJob = transformCronJob;
 const core = __importStar(__nccwpck_require__(9093));
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
+const lodash_1 = __importDefault(__nccwpck_require__(7337));
 const http_client_1 = __nccwpck_require__(6372);
 const _http = new http_client_1.HttpClient();
 const token = core.getInput('auth-token', {
@@ -51963,6 +51965,13 @@ async function findDatabaseById(databaseId) {
         }
     });
     return response.result?.response?.data[0] ?? null;
+}
+async function findPhpIniByVhostId(vhostId) {
+    const response = await _http.postJson(`${baseUri}/database/v1/json/vhostPhpIniList`, {
+        authToken: token,
+        vhostId
+    });
+    return response.result?.response ?? null;
 }
 async function findDatabaseAccesses(userName, databaseId) {
     const response = await _http.postJson(`${baseUri}/database/v1/json/usersFind`, {
@@ -52124,11 +52133,16 @@ async function createVhost(webspace, web, app, domainName, phpVersion) {
     }
     return response.result.response;
 }
-async function updateVhost(id, webspace, web, app, domainName, phpVersion) {
+async function updateVhost(vhost, webspace, web, app, domainName, phpVersion, phpIni) {
+    phpIni.push(...Object.values(transformPhpIni(app.php.ini, app.php.extensions)));
+    const values = (0, lodash_1.default)(phpIni)
+        .groupBy('id')
+        .map(lodash_1.default.spread(lodash_1.default.assign.bind(lodash_1.default)))
+        .value();
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/vhostUpdate`, {
         authToken: token,
         vhost: {
-            id,
+            id: vhost.id,
             domainName,
             serverType: 'nginx',
             webspaceId: webspace.id,
@@ -52152,7 +52166,7 @@ async function updateVhost(id, webspace, web, app, domainName, phpVersion) {
             }
         },
         phpIni: {
-            values: transformPhpIni(app.php.ini, app.php.extensions)
+            values
         }
     });
     if (null === response.result) {

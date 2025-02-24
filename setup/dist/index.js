@@ -50558,6 +50558,7 @@ exports.deleteDatabaseUserById = deleteDatabaseUserById;
 exports.deleteWebspaceUserById = deleteWebspaceUserById;
 exports.findDatabases = findDatabases;
 exports.findDatabaseById = findDatabaseById;
+exports.findPhpIniByVhostId = findPhpIniByVhostId;
 exports.findDatabaseAccesses = findDatabaseAccesses;
 exports.findUsersByName = findUsersByName;
 exports.findDatabaseUsersByName = findDatabaseUsersByName;
@@ -50573,6 +50574,7 @@ exports.createDatabaseUser = createDatabaseUser;
 exports.transformCronJob = transformCronJob;
 const core = __importStar(__nccwpck_require__(9093));
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
+const lodash_1 = __importDefault(__nccwpck_require__(7337));
 const http_client_1 = __nccwpck_require__(6372);
 const _http = new http_client_1.HttpClient();
 const token = core.getInput('auth-token', {
@@ -50732,6 +50734,13 @@ async function findDatabaseById(databaseId) {
         }
     });
     return response.result?.response?.data[0] ?? null;
+}
+async function findPhpIniByVhostId(vhostId) {
+    const response = await _http.postJson(`${baseUri}/database/v1/json/vhostPhpIniList`, {
+        authToken: token,
+        vhostId
+    });
+    return response.result?.response ?? null;
 }
 async function findDatabaseAccesses(userName, databaseId) {
     const response = await _http.postJson(`${baseUri}/database/v1/json/usersFind`, {
@@ -50893,11 +50902,16 @@ async function createVhost(webspace, web, app, domainName, phpVersion) {
     }
     return response.result.response;
 }
-async function updateVhost(id, webspace, web, app, domainName, phpVersion) {
+async function updateVhost(vhost, webspace, web, app, domainName, phpVersion, phpIni) {
+    phpIni.push(...Object.values(transformPhpIni(app.php.ini, app.php.extensions)));
+    const values = (0, lodash_1.default)(phpIni)
+        .groupBy('id')
+        .map(lodash_1.default.spread(lodash_1.default.assign.bind(lodash_1.default)))
+        .value();
     const response = await _http.postJson(`${baseUri}/webhosting/v1/json/vhostUpdate`, {
         authToken: token,
         vhost: {
-            id,
+            id: vhost.id,
             domainName,
             serverType: 'nginx',
             webspaceId: webspace.id,
@@ -50921,7 +50935,7 @@ async function updateVhost(id, webspace, web, app, domainName, phpVersion) {
             }
         },
         phpIni: {
-            values: transformPhpIni(app.php.ini, app.php.extensions)
+            values
         }
     });
     if (null === response.result) {
@@ -51519,18 +51533,18 @@ async function findOrCreateWebspace(webspaceName, app, users, pool) {
 }
 async function configureVhosts(web, app, ref, config, appKey, foundVhosts, webspace, phpVersion) {
     const actualDomainName = translateDomainName(web.domainName ?? '{default}', ref, config, appKey, web.parentDomainName ?? '');
-    let vhost = foundVhosts.find(v => v.domainName === actualDomainName) ?? null;
+    const vhost = foundVhosts.find(v => v.domainName === actualDomainName) ?? null;
     if (null === vhost) {
         core.info(`Configuring ${actualDomainName}...`);
-        vhost = await client.createVhost(webspace, web, app, actualDomainName, phpVersion);
+        await client.createVhost(webspace, web, app, actualDomainName, phpVersion);
+        return { domainName: actualDomainName };
     }
-    else if (mustBeUpdated(vhost, app, web)) {
+    const phpIni = await client.findPhpIniByVhostId(vhost.id);
+    if (mustBeUpdated(vhost, app, web)) {
         core.info(`Configuring ${actualDomainName}...`);
-        vhost = await client.updateVhost(vhost.id, webspace, web, app, actualDomainName, phpVersion);
+        await client.updateVhost(vhost, webspace, web, app, actualDomainName, phpVersion, phpIni?.values ?? []);
     }
-    return {
-        domainName: actualDomainName
-    };
+    return { domainName: actualDomainName };
 }
 async function pruneVhosts(foundVhosts, app, ref, config, appKey) {
     const allowedDomainNames = app.web.map(web => translateDomainName(web.domainName ?? '{default}', ref, config, appKey, web.parentDomainName ?? ''));

@@ -266,18 +266,23 @@ export async function configureVhosts(
     web.parentDomainName ?? ''
   )
 
-  let vhost = foundVhosts.find(v => v.domainName === actualDomainName) ?? null
+  const vhost = foundVhosts.find(v => v.domainName === actualDomainName) ?? null
+
   if (null === vhost) {
     core.info(`Configuring ${actualDomainName}...`)
-    vhost = await client.createVhost(webspace, web, app, actualDomainName, phpVersion)
-  } else if (mustBeUpdated(vhost, app, web)) {
-    core.info(`Configuring ${actualDomainName}...`)
-    vhost = await client.updateVhost(vhost.id, webspace, web, app, actualDomainName, phpVersion)
+    await client.createVhost(webspace, web, app, actualDomainName, phpVersion)
+
+    return { domainName: actualDomainName }
   }
 
-  return {
-    domainName: actualDomainName
+  const phpIni = await client.findPhpIniByVhostId(vhost.id)
+
+  if (mustBeUpdated(vhost, app, web)) {
+    core.info(`Configuring ${actualDomainName}...`)
+    await client.updateVhost(vhost, webspace, web, app, actualDomainName, phpVersion, phpIni?.values ?? [])
   }
+
+  return { domainName: actualDomainName }
 }
 
 export async function pruneVhosts(
