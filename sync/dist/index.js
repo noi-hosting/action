@@ -52113,7 +52113,24 @@ async function createVhost(webspace, web, app, domainName, phpVersion) {
                     matchType: matchString.startsWith('^') ? 'regex' : matchString.startsWith('/') ? 'directory' : 'default',
                     locationType: (location.allow ?? true) ? 'generic' : 'blockAccess',
                     mapScript: typeof (location.passthru ?? false) === 'string' ? location.passthru : '',
-                    phpEnabled: false !== (location.passthru ?? false)
+                    phpEnabled: false !== (location.passthru ?? false),
+                    httpHeader: (() => {
+                        const headers = [];
+                        const cacheControl = [];
+                        if (location.expires) {
+                            cacheControl.push(`max-age=${parseDurationToSeconds(location.expires)}`);
+                        }
+                        if (location.immutable) {
+                            cacheControl.push('immutable');
+                        }
+                        if (cacheControl.length > 0) {
+                            headers.push({
+                                name: 'Cache-Control',
+                                content: cacheControl.join(', ')
+                            });
+                        }
+                        return headers;
+                    })()
                 };
             }),
             sslSettings: {
@@ -52363,6 +52380,24 @@ function transformCronJob(config, phpVersion) {
         cronjob.daypart = config.on ?? '1-5';
     }
     return cronjob;
+}
+function parseDurationToSeconds(duration) {
+    if (typeof duration !== 'string' || !duration.trim()) {
+        return 0;
+    }
+    const match = duration.trim().match(/^(\d+)(min|d|w|m|y)$/i);
+    if (!match)
+        return 0;
+    const value = parseInt(match[1], 10);
+    const unit = match[2].toLowerCase();
+    const multipliers = {
+        min: 60,
+        d: 60 * 60 * 24,
+        w: 60 * 60 * 24 * 7,
+        m: 60 * 60 * 24 * 30,
+        y: 60 * 60 * 24 * 365
+    };
+    return value * multipliers[unit];
 }
 
 

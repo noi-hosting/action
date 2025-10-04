@@ -102,6 +102,7 @@ interface WebConfig {
       passthru?: string | boolean
       expires?: string
       allow?: boolean
+      immutable?: boolean
     }
   }
 }

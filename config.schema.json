@@ -144,6 +144,10 @@
                       "allow": {
                         "type": "boolean",
                         "default": true
+                      },
+                      "immutable": {
+                        "type": "boolean",
+                        "default": false
                       }
                     }
                   }
