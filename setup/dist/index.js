@@ -51160,10 +51160,10 @@ function parseDurationToSeconds(duration) {
     const value = parseInt(match[1], 10);
     const unit = match[2].toLowerCase();
     const multipliers = {
-        min: 60,
+        m: 60,
         d: 60 * 60 * 24,
         w: 60 * 60 * 24 * 7,
-        m: 60 * 60 * 24 * 30,
+        M: 60 * 60 * 24 * 30,
         y: 60 * 60 * 24 * 365
     };
     return value * multipliers[unit];
