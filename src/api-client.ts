@@ -784,7 +784,7 @@ export function transformCronJob(config: CronjobConfig, phpVersion: string): Cro
   return cronjob
 }
 
-type DurationUnit = 'min' | 'd' | 'w' | 'm' | 'y'
+type DurationUnit = 'm' | 'd' | 'w' | 'M' | 'y'
 
 function parseDurationToSeconds(duration: string | null): number {
   if (typeof duration !== 'string' || !duration.trim()) {
@@ -798,10 +798,10 @@ function parseDurationToSeconds(duration: string | null): number {
   const unit = match[2].toLowerCase() as DurationUnit
 
   const multipliers: Record<DurationUnit, number> = {
-    min: 60,
+    m: 60,
     d: 60 * 60 * 24,
     w: 60 * 60 * 24 * 7,
-    m: 60 * 60 * 24 * 30,
+    M: 60 * 60 * 24 * 30,
     y: 60 * 60 * 24 * 365
   }
 
