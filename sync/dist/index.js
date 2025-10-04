@@ -51802,6 +51802,8 @@ exports.createDatabase = createDatabase;
 exports.addDatabaseAccess = addDatabaseAccess;
 exports.createWebspaceUser = createWebspaceUser;
 exports.createDatabaseUser = createDatabaseUser;
+exports.transformPhpIni = transformPhpIni;
+exports.transformLocations = transformLocations;
 exports.transformCronJob = transformCronJob;
 const core = __importStar(__nccwpck_require__(9093));
 const crypto_1 = __importDefault(__nccwpck_require__(6113));
@@ -52107,32 +52109,7 @@ async function createVhost(webspace, web, app, domainName, phpVersion) {
             redirectHttpToHttps: true,
             phpVersion,
             webRoot: `current/${web.root ?? ''}`.replace(/\/$/, ''),
-            locations: Object.entries(web.locations).map(function ([matchString, location]) {
-                return {
-                    matchString,
-                    matchType: matchString.startsWith('^') ? 'regex' : matchString.startsWith('/') ? 'directory' : 'default',
-                    locationType: (location.allow ?? true) ? 'generic' : 'blockAccess',
-                    mapScript: typeof (location.passthru ?? false) === 'string' ? location.passthru : '',
-                    phpEnabled: false !== (location.passthru ?? false),
-                    httpHeader: (() => {
-                        const headers = [];
-                        const cacheControl = [];
-                        if (location.expires) {
-                            cacheControl.push(`max-age=${parseDurationToSeconds(location.expires)}`);
-                        }
-                        if (location.immutable) {
-                            cacheControl.push('immutable');
-                        }
-                        if (cacheControl.length > 0) {
-                            headers.push({
-                                name: 'Cache-Control',
-                                content: cacheControl.join(', ')
-                            });
-                        }
-                        return headers;
-                    })()
-                };
-            }),
+            locations: transformLocations(web),
             sslSettings: {
                 profile: 'modern',
                 managedSslProductCode: 'ssl-letsencrypt-dv-3m'
@@ -52164,15 +52141,7 @@ async function updateVhost(vhost, webspace, web, app, domainName, phpVersion, ph
             redirectHttpToHttps: true,
             phpVersion,
             webRoot: `current/${web.root ?? ''}`.replace(/\/$/, ''),
-            locations: Object.entries(web.locations).map(function ([matchString, location]) {
-                return {
-                    matchString,
-                    matchType: matchString.startsWith('^') ? 'regex' : matchString.startsWith('/') ? 'directory' : 'default',
-                    locationType: (location.allow ?? true) ? 'generic' : 'blockAccess',
-                    mapScript: typeof (location.passthru ?? false) === 'string' ? location.passthru : '',
-                    phpEnabled: false !== (location.passthru ?? false)
-                };
-            }),
+            locations: transformLocations(web),
             sslSettings: {
                 profile: 'modern',
                 managedSslProductCode: 'ssl-letsencrypt-dv-3m'
@@ -52323,6 +52292,34 @@ function transformPhpIni(ini, extensions) {
         key: k,
         value: `${v}`
     }));
+}
+function transformLocations(web) {
+    return Object.entries(web.locations).map(function ([matchString, location]) {
+        return {
+            matchString,
+            matchType: matchString.startsWith('^') ? 'regex' : matchString.startsWith('/') ? 'directory' : 'default',
+            locationType: (location.allow ?? true) ? 'generic' : 'blockAccess',
+            mapScript: typeof (location.passthru ?? false) === 'string' ? String(location.passthru) : '',
+            phpEnabled: false !== (location.passthru ?? false),
+            httpHeader: (() => {
+                const headers = [];
+                const cacheControl = [];
+                if (location.expires) {
+                    cacheControl.push(`max-age=${parseDurationToSeconds(location.expires)}`);
+                }
+                if (location.immutable) {
+                    cacheControl.push('immutable');
+                }
+                if (cacheControl.length > 0) {
+                    headers.push({
+                        name: 'Cache-Control',
+                        content: cacheControl.join(', ')
+                    });
+                }
+                return headers;
+            })()
+        };
+    });
 }
 function transformCronJob(config, phpVersion) {
     // Use default values so that _.isEqual comparison works

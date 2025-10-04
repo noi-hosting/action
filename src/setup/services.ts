@@ -10,7 +10,10 @@ import {
   VhostResult,
   WebspaceAccess,
   WebspaceResult,
-  UserResult
+  UserResult,
+  transformLocations,
+  transformPhpIni,
+  PhpIniValueResult
 } from '../api-client'
 
 export async function getWebspace(
@@ -277,7 +280,7 @@ export async function configureVhosts(
 
   const phpIni = await client.findPhpIniByVhostId(vhost.id)
 
-  if (mustBeUpdated(vhost, app, web)) {
+  if (mustBeUpdated(vhost, app, web, phpIni?.values ?? [])) {
     core.info(`Configuring ${actualDomainName}...`)
     await client.updateVhost(vhost, webspace, web, app, actualDomainName, phpVersion, phpIni?.values ?? [])
   }
@@ -513,12 +516,20 @@ function translateDomainName(
     .replace(/\//gi, '--')
 }
 
-function mustBeUpdated(vhost: VhostResult, app: AppConfig, web: WebConfig): boolean {
+function mustBeUpdated(vhost: VhostResult, app: AppConfig, web: WebConfig, phpIni: PhpIniValueResult[]): boolean {
   if (app.php.version !== vhost.phpVersion) {
     return true
   }
 
-  // todo phpini
+  const expectedPhpIni = transformPhpIni(app.php.ini, app.php.extensions)
+  if (
+    !_.isEqual(
+      phpIni.map((item, i) => _.pick(item, Object.keys(expectedPhpIni[i] ?? {}))),
+      expectedPhpIni
+    )
+  ) {
+    return true
+  }
 
   if ((web.www ?? true) !== vhost.enableAlias) {
     return true
@@ -528,7 +539,15 @@ function mustBeUpdated(vhost: VhostResult, app: AppConfig, web: WebConfig): bool
     return true
   }
 
-  // todo locations
+  const expectedLocations = transformLocations(web)
+  if (
+    !_.isEqual(
+      vhost.locations?.map((loc, i) => _.pick(loc, Object.keys(expectedLocations[i] ?? {}))),
+      expectedLocations
+    )
+  ) {
+    return true
+  }
 
   return false
 }

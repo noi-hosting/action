@@ -417,36 +417,7 @@ export async function createVhost(
         redirectHttpToHttps: true,
         phpVersion,
         webRoot: `current/${web.root ?? ''}`.replace(/\/$/, ''),
-        locations: Object.entries(web.locations).map(function ([matchString, location]) {
-          return {
-            matchString,
-            matchType: matchString.startsWith('^') ? 'regex' : matchString.startsWith('/') ? 'directory' : 'default',
-            locationType: (location.allow ?? true) ? 'generic' : 'blockAccess',
-            mapScript: typeof (location.passthru ?? false) === 'string' ? location.passthru : '',
-            phpEnabled: false !== (location.passthru ?? false),
-            httpHeader: (() => {
-              const headers = []
-              const cacheControl = []
-
-              if (location.expires) {
-                cacheControl.push(`max-age=${parseDurationToSeconds(location.expires)}`)
-              }
-
-              if (location.immutable) {
-                cacheControl.push('immutable')
-              }
-
-              if (cacheControl.length > 0) {
-                headers.push({
-                  name: 'Cache-Control',
-                  content: cacheControl.join(', ')
-                })
-              }
-
-              return headers
-            })()
-          }
-        }),
+        locations: transformLocations(web),
         sslSettings: {
           profile: 'modern',
           managedSslProductCode: 'ssl-letsencrypt-dv-3m'
@@ -493,15 +464,7 @@ export async function updateVhost(
         redirectHttpToHttps: true,
         phpVersion,
         webRoot: `current/${web.root ?? ''}`.replace(/\/$/, ''),
-        locations: Object.entries(web.locations).map(function ([matchString, location]) {
-          return {
-            matchString,
-            matchType: matchString.startsWith('^') ? 'regex' : matchString.startsWith('/') ? 'directory' : 'default',
-            locationType: (location.allow ?? true) ? 'generic' : 'blockAccess',
-            mapScript: typeof (location.passthru ?? false) === 'string' ? location.passthru : '',
-            phpEnabled: false !== (location.passthru ?? false)
-          }
-        }),
+        locations: transformLocations(web),
         sslSettings: {
           profile: 'modern',
           managedSslProductCode: 'ssl-letsencrypt-dv-3m'
@@ -704,22 +667,57 @@ export async function createDatabaseUser(
   }
 }
 
-function transformPhpIni(
+export function transformPhpIni(
   ini: {
     [key: string]: string | boolean
   },
   extensions: string[]
-): object {
+): PhpIniValueResult[] {
   for (const ext of extensions) {
     if (['apcu', 'imagick', 'memcached', 'oauth', 'redis'].includes(ext)) {
       ini[`extension=${ext}.so`] = 'true'
     }
   }
 
-  return Object.entries(ini).map(([k, v]) => ({
-    key: k,
-    value: `${v}`
-  }))
+  return Object.entries(ini).map(
+    ([k, v]): PhpIniValueResult => ({
+      key: k,
+      value: `${v}`
+    })
+  )
+}
+
+export function transformLocations(web: WebConfig): Location[] {
+  return Object.entries(web.locations).map(function ([matchString, location]) {
+    return {
+      matchString,
+      matchType: matchString.startsWith('^') ? 'regex' : matchString.startsWith('/') ? 'directory' : 'default',
+      locationType: (location.allow ?? true) ? 'generic' : 'blockAccess',
+      mapScript: typeof (location.passthru ?? false) === 'string' ? String(location.passthru) : '',
+      phpEnabled: false !== (location.passthru ?? false),
+      httpHeader: (() => {
+        const headers = []
+        const cacheControl = []
+
+        if (location.expires) {
+          cacheControl.push(`max-age=${parseDurationToSeconds(location.expires)}`)
+        }
+
+        if (location.immutable) {
+          cacheControl.push('immutable')
+        }
+
+        if (cacheControl.length > 0) {
+          headers.push({
+            name: 'Cache-Control',
+            content: cacheControl.join(', ')
+          })
+        }
+
+        return headers
+      })()
+    }
+  })
 }
 
 export function transformCronJob(config: CronjobConfig, phpVersion: string): CronJob {
@@ -920,6 +918,18 @@ interface VhostResult {
   sslSettings: object
 }
 
+interface Location {
+  matchString: string
+  matchType: 'regex' | 'directory' | 'default'
+  locationType: 'generic' | 'blockAccess'
+  mapScript?: string
+  phpEnabled?: boolean
+  httpHeader?: {
+    name: string
+    content: string
+  }[]
+}
+
 interface DatabaseResult {
   id: string
   accesses: DatabaseAccess[]
@@ -959,4 +969,4 @@ interface PhpIniValueResult {
   value: string
 }
 
-export { VhostResult, WebspaceAccess, WebspaceResult, DatabaseResult, UserResult }
+export { VhostResult, WebspaceAccess, WebspaceResult, DatabaseResult, UserResult, PhpIniResult, PhpIniValueResult }
