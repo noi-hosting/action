@@ -52297,7 +52297,11 @@ function transformLocations(web) {
     return Object.entries(web.locations).map(function ([matchString, location]) {
         return {
             matchString,
-            matchType: matchString.startsWith('^') ? 'regex' : matchString.startsWith('/') ? 'directory' : 'default',
+            matchType: matchString.startsWith('^') || matchString.endsWith('$')
+                ? 'regex'
+                : matchString.startsWith('/')
+                    ? 'directory'
+                    : 'default',
             locationType: (location.allow ?? true) ? 'generic' : 'blockAccess',
             mapScript: typeof (location.passthru ?? false) === 'string' ? String(location.passthru) : '',
             phpEnabled: false !== (location.passthru ?? false),
